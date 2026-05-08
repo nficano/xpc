@@ -1,0 +1,35 @@
+name: real-vm-test
+
+# Manual-dispatch only. Hits a live XP VM and is gated behind a GitHub
+# environment that requires manual approval. Configure secrets/vars in the
+# 'real-vm-test' environment under Settings -> Environments.
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'xpc profile name to use (matches ~/.xpc/config on the runner)'
+        required: false
+        default: 'default'
+
+permissions:
+  contents: read
+
+jobs:
+  real-vm:
+    runs-on: ubuntu-latest
+    environment: real-vm-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+      - name: Run real-VM suite
+        env:
+          XPC_PROFILE: ${{ inputs.profile }}
+        run: |
+          # Real-VM tests land in Phase 4. For now this workflow exists so the
+          # gate is reachable from the GitHub UI.
+          echo "Phase 2 scaffold: real-VM test runner not yet implemented."
+          echo "When implemented, this will run 'make test-real-vm' against profile $XPC_PROFILE"

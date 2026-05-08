@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# Go
+bin/
+dist/
+*.test
+*.out
+*.prof
+coverage.out
+coverage.html
+
+# Python (agent dev)
+__pycache__/
+*.pyc
+*.pyo
+agent/.venv/
+.venv/
+.python-version
+
+# Local secrets / env
+.env
+.env.local
+*.local
+
+# Build artifacts
+artifacts/
