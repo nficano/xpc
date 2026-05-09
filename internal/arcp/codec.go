@@ -18,7 +18,11 @@ func WriteFrame(w io.Writer, e *Envelope) error {
 	if err != nil {
 		return err
 	}
-	return WriteRaw(w, body)
+	if err := WriteRaw(w, body); err != nil {
+		return err
+	}
+	emit(DirSend, e)
+	return nil
 }
 
 // WriteRaw is a lower-level helper that frames already-encoded bytes. Useful
@@ -45,7 +49,12 @@ func ReadFrame(r io.Reader) (*Envelope, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Unmarshal(body)
+	e, err := Unmarshal(body)
+	if err != nil {
+		return nil, err
+	}
+	emit(DirRecv, e)
+	return e, nil
 }
 
 // ReadRaw reads the framing header and the body bytes; it does not parse

@@ -2,14 +2,17 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/nficano/xpc/internal/arcp"
 	"github.com/nficano/xpc/internal/profile"
 	"github.com/nficano/xpc/internal/version"
 )
@@ -24,6 +27,7 @@ type Globals struct {
 	Verbose     bool
 	Timeout     time.Duration
 	DryRun      bool
+	DebugARCP   bool
 
 	// Resolved at first read (lazy).
 	resolvedProfile *profile.Profile
@@ -39,6 +43,21 @@ func New() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       version.String(),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if path := os.Getenv("XPC_DEBUG_ARCP_FILE"); path != "" {
+				f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+				if err != nil {
+					return fmt.Errorf("XPC_DEBUG_ARCP_FILE: %w", err)
+				}
+				// Held for the process lifetime; closed by the OS on exit.
+				arcp.SetObserver(newARCPObserver(f))
+				return nil
+			}
+			if g.DebugARCP || os.Getenv("XPC_DEBUG_ARCP") != "" {
+				arcp.SetObserver(newARCPObserver(cmd.ErrOrStderr()))
+			}
+			return nil
+		},
 	}
 	root.SetVersionTemplate("{{.Version}}\n")
 	root.PersistentFlags().StringVar(&g.ProfileName, "profile", "", "Profile name (default: $XPC_PROFILE or active state)")
@@ -48,6 +67,7 @@ func New() *cobra.Command {
 	root.PersistentFlags().BoolVarP(&g.Verbose, "verbose", "v", false, "Verbose output")
 	root.PersistentFlags().DurationVar(&g.Timeout, "timeout", 0, "Per-invocation timeout (0 = none)")
 	root.PersistentFlags().BoolVar(&g.DryRun, "dry-run", false, "Show planned actions without executing them")
+	root.PersistentFlags().BoolVar(&g.DebugARCP, "debug-arcp", false, "Log every ARCP envelope sent/received as JSON lines on stderr (also: XPC_DEBUG_ARCP=1)")
 
 	root.AddCommand(newVersionCmd(g))
 	root.AddCommand(newConfigureCmd(g))
@@ -139,6 +159,34 @@ func (g *Globals) ResolveProfile() (*profile.Profile, error) {
 	}
 	g.resolvedProfile = p
 	return p, nil
+}
+
+// ---- ARCP observability ---------------------------------------------------
+
+// newARCPObserver returns an arcp.Observer that emits one JSON line per
+// envelope to w. Format: {"ts":..., "dir":"send|recv", "envelope":{...}}.
+// Writes are serialized so concurrent send/recv envelopes don't interleave.
+func newARCPObserver(w io.Writer) arcp.Observer {
+	var mu sync.Mutex
+	return func(dir arcp.Direction, e *arcp.Envelope) {
+		record := struct {
+			Ts       string         `json:"ts"`
+			Dir      string         `json:"dir"`
+			Envelope *arcp.Envelope `json:"envelope"`
+		}{
+			Ts:       time.Now().UTC().Format(time.RFC3339Nano),
+			Dir:      string(dir),
+			Envelope: e,
+		}
+		buf, err := json.Marshal(record)
+		if err != nil {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		_, _ = w.Write(buf)
+		_, _ = w.Write([]byte("\n"))
+	}
 }
 
 // ---- exit codes -----------------------------------------------------------
