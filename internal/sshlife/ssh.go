@@ -9,15 +9,22 @@
 // The remote shell is the Cygwin bash sshd that xpctl bootstraps on the VM.
 // Paths are POSIX-style (/cygdrive/c/...) for the upload helpers; the
 // PutFile/PutBytes wrappers convert from C:\... automatically.
+//
+// Host-key trust uses TOFU (trust on first use): the first connection to a
+// new host writes its key to ~/.xpc/known_hosts; subsequent connections
+// require a byte-for-byte match. A changed key short-circuits the dial with
+// an error.
 package sshlife
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -33,10 +40,14 @@ type Client struct {
 
 // DialOptions configures Dial.
 type DialOptions struct {
-	User            string
-	Password        string
-	Timeout         time.Duration
-	HostKeyCallback ssh.HostKeyCallback // default: InsecureIgnoreHostKey for v0 (TODO Phase 5b: TOFU)
+	User     string
+	Password string
+	Timeout  time.Duration
+	// HostKeyCallback overrides the default TOFU callback. Leave nil to
+	// trust on first use against ~/.xpc/known_hosts.
+	HostKeyCallback ssh.HostKeyCallback
+	// KnownHostsPath overrides the default ~/.xpc/known_hosts location.
+	KnownHostsPath string
 }
 
 // Dial opens an SSH connection. addr is "host:port"; if no port, 22 is used.
@@ -49,7 +60,15 @@ func Dial(addr string, opt DialOptions) (*Client, error) {
 	}
 	hk := opt.HostKeyCallback
 	if hk == nil {
-		hk = ssh.InsecureIgnoreHostKey() //nolint:gosec // v0 SSH-bootstrap; future Phase 5b adds TOFU
+		path := opt.KnownHostsPath
+		if path == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return nil, fmt.Errorf("ssh: home dir: %w", err)
+			}
+			path = filepath.Join(home, ".xpc", "known_hosts")
+		}
+		hk = TOFUHostKey(path)
 	}
 	cfg := &ssh.ClientConfig{
 		User:            opt.User,
@@ -224,4 +243,92 @@ func cygDir(p string) string {
 
 func shellQ(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// TOFUHostKey returns an ssh.HostKeyCallback that:
+//
+//   - accepts and records the host key on first contact (writes to path)
+//   - rejects subsequent connections whose key differs from the recorded one
+//
+// The known_hosts file uses the standard OpenSSH-ish line format
+// "<host> <key-type> <base64-key>". Multiple entries per host are tolerated;
+// the callback succeeds if any line matches the presented key exactly.
+func TOFUHostKey(path string) ssh.HostKeyCallback {
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		encoded := base64.StdEncoding.EncodeToString(key.Marshal())
+		canonical := canonicalHostName(hostname, remote)
+
+		data, err := os.ReadFile(path)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("ssh: read %s: %w", path, err)
+		}
+
+		// Look for an existing entry for this host.
+		var existingTypes []string
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.SplitN(line, " ", 3)
+			if len(parts) < 3 {
+				continue
+			}
+			if !hostMatches(parts[0], canonical) {
+				continue
+			}
+			if parts[1] == key.Type() && parts[2] == encoded {
+				return nil
+			}
+			existingTypes = append(existingTypes, parts[1])
+		}
+
+		if len(existingTypes) > 0 {
+			return fmt.Errorf(
+				"ssh: host key for %s changed (have %s in %s, presenting %s) -- potential MITM, refusing",
+				canonical, strings.Join(existingTypes, ","), path, key.Type())
+		}
+
+		// First contact: append.
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return fmt.Errorf("ssh: mkdir %s: %w", filepath.Dir(path), err)
+		}
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			return fmt.Errorf("ssh: open %s: %w", path, err)
+		}
+		defer func() { _ = f.Close() }()
+		if _, err := fmt.Fprintf(f, "%s %s %s\n", canonical, key.Type(), encoded); err != nil {
+			return fmt.Errorf("ssh: append %s: %w", path, err)
+		}
+		return nil
+	}
+}
+
+// canonicalHostName strips the :port suffix that x/crypto/ssh adds to
+// hostname, matching the OpenSSH known_hosts convention.
+func canonicalHostName(hostname string, _ net.Addr) string {
+	if idx := strings.LastIndex(hostname, ":"); idx > 0 {
+		// Make sure it isn't an IPv6 literal "[::1]:22".
+		if !strings.Contains(hostname[:idx], "]") || strings.HasPrefix(hostname, "[") {
+			return hostname[:idx]
+		}
+	}
+	return hostname
+}
+
+// hostMatches checks whether a known_hosts hostname field matches the dialed
+// hostname. We do not implement OpenSSH's full hashed/wildcard semantics --
+// just exact match plus a few common formats.
+func hostMatches(stored, dialed string) bool {
+	if stored == dialed {
+		return true
+	}
+	// Stored "h1,h2" comma list.
+	for _, h := range strings.Split(stored, ",") {
+		if h == dialed {
+			return true
+		}
+	}
+	return false
 }

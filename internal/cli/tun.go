@@ -25,6 +25,7 @@ import (
 func newTunCmd(g *Globals) *cobra.Command {
 	var (
 		localSpec   string
+		reverseSpec string
 		idleTimeout time.Duration
 	)
 	c := &cobra.Command{
@@ -44,6 +45,10 @@ Examples:
 `,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if reverseSpec != "" {
+				return wrapUsage(fmt.Errorf(
+					"-R reverse forwarding is not yet implemented: needs an agent->host tool.invoke primitive (TASKS.md open question)"))
+			}
 			if localSpec == "" {
 				return wrapUsage(fmt.Errorf("--local (or -L) is required: localPort:vmHost:vmPort"))
 			}
@@ -82,6 +87,7 @@ Examples:
 		},
 	}
 	c.Flags().StringVarP(&localSpec, "local", "L", "", "Forward localPort:vmHost:vmPort (mirrors ssh -L)")
+	c.Flags().StringVarP(&reverseSpec, "remote", "R", "", "Reverse forward (NOT YET IMPLEMENTED)")
 	c.Flags().DurationVar(&idleTimeout, "idle-timeout", 0, "Drop forwards idle for this long (0 = never)")
 	return c
 }
