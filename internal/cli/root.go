@@ -58,6 +58,26 @@ func New() *cobra.Command {
 	root.AddCommand(newExecCmd(g))
 	root.AddCommand(newBootstrapCmd(g))
 	root.AddCommand(newAgentCmd(g))
+	// Phase 6 subcommands.
+	root.AddCommand(newInfoCmd(g))
+	root.AddCommand(newNetCmd(g))
+	root.AddCommand(newPsCmd(g))
+	root.AddCommand(newRegCmd(g))
+	root.AddCommand(newSvcCmd(g))
+	root.AddCommand(newEnvCmd(g))
+	root.AddCommand(newBatCmd(g))
+	root.AddCommand(newEvtCmd(g))
+	root.AddCommand(newWatchCmd(g))
+	root.AddCommand(newPyCmd(g))
+	root.AddCommand(newDllCmd(g))
+	root.AddCommand(newCpCmd(g))
+	root.AddCommand(newShotCmd(g))
+	// Filesystem helpers (xpctl extras renamed to top-level).
+	root.AddCommand(newCatCmd(g))
+	root.AddCommand(newHeadCmd(g))
+	root.AddCommand(newTailCmd(g))
+	root.AddCommand(newFindCmd(g))
+	root.AddCommand(newSumCmd(g))
 
 	return root
 }

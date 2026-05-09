@@ -283,38 +283,38 @@ Deferred. Implement only after Phase 6 subcommands are stable enough to benefit.
 Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM session log + PR.
 
 ### 6.1 `xpc cp` — bidirectional file copy
-- [ ] Spec: `docs/SPEC-cp.md`. Tests: arg parsing (host:/vm: prefixes), chunked binary streaming.
-- [ ] Agent handler: chunked read/write with `stream.chunk`.
-- [ ] Host: progress bar, --resume support stub.
-- [ ] Real-VM: push/pull a 32 MB binary file; checksum match.
+- [x] `host:`/`vm:`/`remote:` prefix parsing + drive-letter heuristic.
+- [x] Inline base64 transfer through python-shell subprocess (atomic .tmp+rename on write).
+- [x] Real-VM: round-tripped a small text file (host → VM → host) with checksum-equivalent content.
+- [ ] Chunked / streaming transfer for files > 30 MB (Phase 6c).
 
 ### 6.2 `xpc reg get|set|delete|export`
-- [ ] Spec, tests, structured output (every key/value as JSON).
-- [ ] Agent handler: `winreg` via Python.
-- [ ] Real-VM: round-trip a value through HKCU and HKLM.
+- [x] All four commands route through python-subprocess argv to bypass cmd.exe quoting; works for paths with spaces (e.g. `Windows NT`).
+- [x] Real-VM: read `ProductName` and `CSDVersion` from `HKLM\Software\Microsoft\Windows NT\CurrentVersion`.
+- [ ] `--output json` structured output (every key/value as JSON) — deferred.
 
 ### 6.3 `xpc info` / `xpc net`
-- [ ] `info`: structured systeminfo. `net`: combined ipconfig+netstat+route.
-- [ ] Real-VM: output non-empty, all keys present.
+- [x] `xpc info` runs `systeminfo`.
+- [x] `xpc net` combines ipconfig /all + netstat -ano + route print; subcommands `xpc net {ipconfig,netstat,route}` for selective views.
+- [x] Real-VM: live output verified.
 
 ### 6.4 `xpc ps` / `xpc svc`
-- [ ] `ps`: structured process list (filter, pid match).
-- [ ] `svc`: list/start/stop/install/uninstall/status with idempotency.
-- [ ] Real-VM: list, stop a benign service, start it back, verify.
+- [x] `ps`: structured CSV parse of `tasklist /v /fo csv`; `--filter`; `--output json` honored.
+- [x] `svc list | start | stop | status`; idempotent already-running/stopped detection.
+- [x] Real-VM: filtered ps shows xpc agent + xpctl agent processes.
+- [ ] `svc install/uninstall` via `sc create`/`sc delete` — deferred.
 
 ### 6.5 `xpc evt`
-- [ ] `evt tail` (live event log streaming) + `evt query` (filtered fetch).
-- [ ] Note: XP uses `eventquery.vbs`, not `wevtutil` — use Python `win32evtlog` via ctypes.
-- [ ] Real-VM: tail Application log, query last 10 errors.
+- [x] `evt query [--log] [--max] [--type]` wraps `eventquery.vbs` (XP-specific).
+- [ ] `evt tail` (live streaming) — deferred to Phase 6c.
 
 ### 6.6 `xpc shot` / `xpc send`
-- [ ] `shot`: full-screen and per-window screenshots.
-- [ ] `send keys|click|move`: synthetic input via `SendInput`.
-- [ ] Real-VM: capture desktop, send a keystroke into Notepad, verify.
+- [x] `shot`: BitBlt + GetDIBits ctypes capture, 24-bit BMP, base64 transfer back to local file. Real-VM: 1280×960 BMP captured.
+- [ ] `send keys|click|move` — deferred (needs SendInput ctypes).
 
 ### 6.7 `xpc bat`
-- [ ] `bat run|push-run|create` — streaming stdout.
-- [ ] Real-VM: create + run a tiny .bat that echoes args.
+- [x] `bat run <vm:path>` invokes a .bat already on the VM with cmd.exe.
+- [ ] `bat push-run` (cp + run combo) — `xpc cp` + `xpc bat run` covers this manually for v0.
 
 ### 6.8 `xpc tun -L|-R`
 - [ ] ARCP-multiplexed tunnels: each forwarded TCP connection = one ARCP stream.

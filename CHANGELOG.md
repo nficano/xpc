@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 6 (first wave) — subcommand surface**:
+  - Diagnostics: `xpc info`, `xpc net [ipconfig|netstat|route]`, `xpc ps [--filter]`.
+  - Registry: `xpc reg {get,set,delete,export}` routed through python-subprocess
+    argv to bypass cmd.exe quoting bugs (paths with spaces / backslashes).
+  - Services: `xpc svc {list,start,stop,status}` with already-running /
+    already-stopped idempotency.
+  - Environment: `xpc env list`, `xpc env set` (`setx`).
+  - Batch + events: `xpc bat run`, `xpc evt query` (eventquery.vbs).
+  - Loop: `xpc watch -- <cmd>` (xpctl-style).
+  - Python on the VM: `xpc py {run,local,pip}`.
+  - Files: `xpc cp <src> <dst>` (host:/vm: bidirectional, inline base64,
+    ~30 MB cap before chunked transfer); `xpc cat`, `xpc head -n`,
+    `xpc tail -n`, `xpc find [--glob] [--regex]`, `xpc sum [--algo]`.
+  - Reverse-engineering: `xpc dll list <pid>`, `xpc dll regsvr32`,
+    `xpc shot [-o]` (BitBlt + GetDIBits → 24-bit BMP, base64-transferred).
+  - All commands live in `internal/cli` and reuse `internal/cli/session.go` +
+    `internal/cli/run.go` for the standard exec round-trip.
+  - Real-VM verification at `docs/sessions/phase-6-subcommands.md`.
+
 - **Phase 5 host CLI** (cobra-based dispatcher):
   - `cmd/xpc/main.go` is the canonical entry point; `internal/cli` houses the
     cobra command tree.
