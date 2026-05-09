@@ -325,9 +325,10 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 - [ ] `bat push-run` (cp + run combo) — `xpc cp` + `xpc bat run` covers this manually for v0.
 
 ### 6.8 `xpc tun -L|-R`
-- [ ] ARCP-multiplexed tunnels: each forwarded TCP connection = one ARCP stream.
-- [ ] `xpc tun -L 8080:localhost:80` (forward host:8080 → VM:80) and reverse.
-- [ ] Real-VM: forward to a process on the VM, hit it from the host.
+- [x] Agent-side `tun.connect` tool + dispatch routing for client-sourced `stream.chunk` / `stream.close` to the job's VM socket.
+- [x] Host-side `xpc tun -L localPort:vmHost:vmPort` with reader/forwarder/cancel goroutines and a write mutex.
+- [x] Real-VM: forwarded `127.0.0.1:19578 -> 127.0.0.1:9578` and round-tripped xpctl's length-prefixed-JSON ping; agent log shows `tun.connect [job=...] -> 127.0.0.1:9578`.
+- [ ] `xpc tun -R` (reverse forward) — deferred.
 
 ### 6.9 `xpc py`
 - [ ] `py run`, `py repl`, `py pip`, `py local` (run local file with client injected).

@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 6c — `xpc tun` (bidirectional ARCP streams)**:
+  - Agent: new `tun.connect` tool opens a VM-side TCP socket and pumps
+    bytes to the host via `stream.chunk(delta_b64)` envelopes.
+  - Agent: `Connection._dispatch` now also routes client-sourced
+    `stream.chunk` and `stream.close` envelopes -- looking up the running
+    job by `job_id` and writing/half-closing its `tun_socket`. Non-tun jobs
+    drop the chunks silently.
+  - Host: `xpc tun -L localPort:vmHost:vmPort` cobra command with a
+    reader goroutine + forwarder goroutine + write mutex. The forwarder
+    waits on a `jobReady` channel so its first `stream.chunk` doesn't
+    race ahead of `job.accepted`.
+  - Real-VM verified: xpctl ping JSON probe round-trips through
+    `xpc tun -L 19578:127.0.0.1:9578` to the xpctl agent on the VM.
+  - First xpc command to exercise both directions of ARCP streaming on a
+    single job; foundation for future `xpc ghidra/ida` (RE-server tunnels).
+
 - **Phase 5b — SSH-driven bootstrap + agent lifecycle**:
   - `internal/sshlife` Go package wrapping `golang.org/x/crypto/ssh`:
     password-auth Dial, Run (with timeout + exit-status capture), PutFile /
