@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 5 host CLI** (cobra-based dispatcher):
+  - `cmd/xpc/main.go` is the canonical entry point; `internal/cli` houses the
+    cobra command tree.
+  - `internal/profile` AWS-style split: `~/.xpc/config` (non-secret),
+    `~/.xpc/credentials` (PSK + SSH password, base64 PSK), `~/.xpc/state`
+    (active profile pointer); 0700 dir, 0600 files; env-var overrides.
+  - `xpc configure`, `xpc profile {list,add,remove,use}`, `xpc use <name>`,
+    `xpc completion {bash,zsh,fish,powershell}`, `xpc migrate-from-xpctl`,
+    `xpc bootstrap` (generates trust material + manual deploy instructions),
+    `xpc agent {ping,info}`, `xpc exec` with streaming.
+  - Session helper (`internal/cli/session.go`) wraps TLS dial + session.open
+    + tool.invoke + stream.chunk → stdout/stderr → terminal envelope reading.
+  - Sentinel error types map to exit codes: UsageError → 2,
+    ConnectionError → 3, AuthError → 4, RemoteError → propagated.
+  - Real-VM verification: `xpc exec ver`, `xpc exec 'dir C:\Python34'`,
+    `xpc agent ping`, `xpc agent info`, plus shell completion. Session log
+    at `docs/sessions/phase-5-cli.md`.
+
 - Phase 0 investigation document (`docs/INVESTIGATION.md`) capturing xpctl's
   architecture, the live target VM environment, and a complete xpctl-to-xpc
   command-surface mapping.
