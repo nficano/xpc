@@ -20,6 +20,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Granular task tracker (`TASKS.md`).
 - Repository scaffolding: Go module, CI workflows (lint, test, manual real-VM),
   pre-commit hooks, MIT license, branch protection on `main`.
+- **Phase 4 agent core** (`agent/agent.py`):
+  - TLS 1.2 server with HMAC-SHA256 envelope verification.
+  - Per-connection threaded read loop with concurrent job workers and a
+    write lock for serialized outbound envelopes.
+  - Tool registry with `exec` (streaming subprocess via per-stream chunk
+    pumps + terminal `tool.result`) and `agent.info`.
+  - `cancel` envelope kills in-flight subprocesses; `ToolError` surfaces
+    as structured `tool.error` + `job.failed`.
+  - HKLM Run-key `install-startup` / `remove-startup` / `startup-status`
+    sub-commands.
+  - Rotating file logger at `C:\xpc\agent.log`.
+  - In-process tests via `socketpair` exercising session.open, ping,
+    auth failure, dispatch, and ToolError wrapping.
+  - `cmd/xpc-exec` Go end-to-end client.
+  - Real-VM verification: `ver`, `echo`, `dir C:\Python34`, and an
+    `os.listdir(r"C:\\")` python-shell run all stream correctly. Session
+    log at `docs/sessions/phase-4-agent.md`.
+
 - **Phase 3 wire protocol foundation** (`docs/PROTOCOL.md`):
   - `internal/arcp` Go package: typed envelope, sorted-key canonical JSON
     marshaling, HMAC-SHA256 sign/verify, length-prefixed framing (4-byte
