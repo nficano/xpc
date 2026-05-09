@@ -22,6 +22,7 @@ HKLM Run key so it auto-starts at next login.
 from __future__ import absolute_import, print_function
 
 import argparse
+import base64
 import binascii
 import logging
 import logging.handlers
@@ -251,9 +252,86 @@ def tool_agent_info(arguments, ctx, job):
     }
 
 
+def tool_tun_connect(arguments, ctx, job):
+    """tun.connect -- open a TCP socket on the VM and bidirectionally pump bytes.
+
+    Arguments:
+      host (str, required) -- target hostname or IP reachable from the VM
+      port (int, required) -- target port
+
+    Behavior:
+      * Opens a TCP socket to (host, port).
+      * Stores the socket on the job so the connection's stream.chunk handler
+        (see Connection._handle_stream_chunk) can write client-sourced bytes
+        into the VM-side socket.
+      * Reads from the VM-side socket and emits stream.chunk envelopes
+        (delta_b64) on a fresh upstream stream until EOF or cancel.
+      * On exit, closes the VM-side socket and emits stream.close.
+    """
+    target_host = arguments.get("host", "")
+    target_port = arguments.get("port", 0)
+    if not target_host:
+        raise ToolError("INVALID_ARGS", "host required", retryable=False)
+    try:
+        target_port = int(target_port)
+    except (TypeError, ValueError):
+        raise ToolError("INVALID_ARGS", "port must be an integer", retryable=False)
+    if target_port <= 0 or target_port > 65535:
+        raise ToolError("INVALID_ARGS", "port out of range", retryable=False)
+
+    log.info("tun.connect [job=%s] -> %s:%d", job.job_id, target_host, target_port)
+
+    try:
+        sock = socket.create_connection((target_host, target_port), timeout=10)
+    except (OSError, socket.error) as exc:
+        raise ToolError("TUN_CONNECT_FAILED", str(exc), retryable=False)
+    sock.settimeout(0.5)  # short timeout so we can poll job.cancel between reads
+
+    # Expose the socket so Connection._handle_stream_chunk routes inbound
+    # bytes to it.
+    job.tun_socket = sock
+
+    upstream_id = arcp.new_id(arcp.PREFIX_STREAM)
+    ctx.emit(arcp.TYPE_STREAM_OPEN,
+             {"content_type": "application/octet-stream", "channel": "upstream"},
+             stream_id=upstream_id)
+
+    closed_reason = "vm_eof"
+    try:
+        while not job.cancel.is_set():
+            try:
+                chunk = sock.recv(8192)
+            except socket.timeout:
+                continue
+            except (OSError, socket.error) as exc:
+                closed_reason = "vm_error: {0}".format(exc)
+                break
+            if not chunk:
+                closed_reason = "vm_eof"
+                break
+            ctx.emit(arcp.TYPE_STREAM_CHUNK,
+                     {"delta_b64": base64.b64encode(chunk).decode("ascii")},
+                     stream_id=upstream_id)
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+        try:
+            del job.tun_socket
+        except AttributeError:
+            pass
+        ctx.emit(arcp.TYPE_STREAM_CLOSE,
+                 {"reason": closed_reason},
+                 stream_id=upstream_id)
+
+    return {"closed": True, "reason": closed_reason}
+
+
 TOOLS = {
     "exec": tool_exec,
     "agent.info": tool_agent_info,
+    "tun.connect": tool_tun_connect,
 }
 
 
@@ -330,12 +408,59 @@ class Connection(object):
                 self._handle_tool_invoke(envelope)
             elif ty == arcp.TYPE_CANCEL:
                 self._handle_cancel(envelope)
+            elif ty == arcp.TYPE_STREAM_CHUNK:
+                self._handle_stream_chunk(envelope)
+            elif ty == arcp.TYPE_STREAM_CLOSE:
+                self._handle_stream_close(envelope)
             else:
                 self._send_nack(envelope, "unsupported_type",
                                 "type {0!r} not supported".format(ty))
         except Exception as exc:
             log.exception("dispatch error for type=%s", ty)
             self._send_nack(envelope, "invalid_envelope", str(exc))
+
+    def _handle_stream_chunk(self, envelope):
+        """Route a client-sourced stream.chunk to the matching tun socket.
+
+        v0 only honors stream.chunk for jobs that own a tun_socket (i.e.
+        tun.connect). For exec, stream.chunks flow agent->host only.
+        """
+        job_id = envelope.get("job_id", "")
+        with self.jobs_lock:
+            job = self.jobs.get(job_id)
+        if job is None:
+            return
+        sock = getattr(job, "tun_socket", None)
+        if sock is None:
+            return
+        delta_b64 = (envelope.get("payload") or {}).get("delta_b64", "")
+        if not delta_b64:
+            return
+        try:
+            sock.sendall(base64.b64decode(delta_b64))
+        except (OSError, socket.error) as exc:
+            log.debug("tun_socket sendall failed: %s", exc)
+            try:
+                sock.close()
+            except Exception:
+                pass
+
+    def _handle_stream_close(self, envelope):
+        """Client signalled end-of-input on its downstream stream; close the
+        VM-side write half so the upstream pump in tool_tun_connect notices
+        and exits."""
+        job_id = envelope.get("job_id", "")
+        with self.jobs_lock:
+            job = self.jobs.get(job_id)
+        if job is None:
+            return
+        sock = getattr(job, "tun_socket", None)
+        if sock is None:
+            return
+        try:
+            sock.shutdown(socket.SHUT_WR)
+        except Exception:
+            pass
 
     # ---- handlers ---------------------------------------------------------
 

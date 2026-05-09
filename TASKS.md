@@ -325,9 +325,10 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 - [ ] `bat push-run` (cp + run combo) — `xpc cp` + `xpc bat run` covers this manually for v0.
 
 ### 6.8 `xpc tun -L|-R`
-- [ ] ARCP-multiplexed tunnels: each forwarded TCP connection = one ARCP stream.
-- [ ] `xpc tun -L 8080:localhost:80` (forward host:8080 → VM:80) and reverse.
-- [ ] Real-VM: forward to a process on the VM, hit it from the host.
+- [x] Agent-side `tun.connect` tool + dispatch routing for client-sourced `stream.chunk` / `stream.close` to the job's VM socket.
+- [x] Host-side `xpc tun -L localPort:vmHost:vmPort` with reader/forwarder/cancel goroutines and a write mutex.
+- [x] Real-VM: forwarded `127.0.0.1:19578 -> 127.0.0.1:9578` and round-tripped xpctl's length-prefixed-JSON ping; agent log shows `tun.connect [job=...] -> 127.0.0.1:9578`.
+- [ ] `xpc tun -R` (reverse forward) — deferred.
 
 ### 6.9 `xpc py`
 - [ ] `py run`, `py repl`, `py pip`, `py local` (run local file with client injected).
@@ -355,9 +356,10 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 - [ ] Real-VM: trace a tiny program, pull the result, verify entries.
 
 ### 6.14 `xpc ghidra` / `xpc ida`
-- [ ] `ghidra start|stop` — ghidra_server lifecycle + tunnel.
-- [ ] `ida start|stop` — IDA remote-debug stub lifecycle + tunnel.
-- [ ] Real-VM: start ghidra_server, connect from local Ghidra over the tunnel.
+- [x] `xpc ghidra start [--binary] [--port] [--repo]` / `xpc ghidra stop`. Detached spawn via `os.dup2`-to-NUL + `DETACHED_PROCESS`; PID saved to `C:\xpc\ghidra.runlog.pid`. Stop matches `java.exe` with `%ghidra%` in cmdline.
+- [x] `xpc ida start [--binary] [--port]` / `xpc ida stop`. Same lifecycle pattern; defaults target `C:\IDA\dbgsrv\win32_remote.exe` on port 23946. Stop matches both `win32_remote.exe` and `dbgsrv.exe`.
+- [x] Tunnel decoupled: users run `xpc tun -L <port>:127.0.0.1:<port>` separately.
+- [ ] Live verification waits until Ghidra / IDA are installed on the VM.
 
 ### Filesystem extras (preserved from xpctl, renamed)
 
