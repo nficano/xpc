@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 5b — SSH-driven bootstrap + agent lifecycle**:
+  - `internal/sshlife` Go package wrapping `golang.org/x/crypto/ssh`:
+    password-auth Dial, Run (with timeout + exit-status capture), PutFile /
+    PutBytes via the Cygwin `cat > <path>` pattern. Win32 paths auto-
+    translated to `/cygdrive/c/...`.
+  - `agent/embed.go` ships `agent.py`, `arcp.py`, and a `ManagePy` constant
+    (kill / start / restart helper with `os.dup2`-to-NUL detachment) inside
+    the Go binary via `//go:embed`.
+  - `xpc bootstrap` now: generates RSA-2048 cert + PSK locally, SSHes to
+    the VM, uploads all six files, restarts the agent via `manage.py`,
+    polls until the listener is up, saves fingerprint + PSK into the
+    profile. `--no-deploy` retains the manual-steps mode.
+  - `xpc agent {start,stop,restart,tail}` drive `manage.py` over SSH.
+    `start`/`restart` wait for the TCP listener before returning so chained
+    calls (`agent start; agent ping`) don't race.
+  - Real-VM verification at `docs/sessions/phase-5b-ssh-bootstrap.md`.
+
 - **Phase 6 (second wave) — RE-flavored subcommands**:
   - `xpc fetch <url> [vm:path]`: host downloads URL, then `cp` to VM
     (default `C:\xpc\downloads\<basename>`).

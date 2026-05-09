@@ -19,6 +19,10 @@ func newAgentCmd(g *Globals) *cobra.Command {
 	}
 	cmd.AddCommand(newAgentPingCmd(g))
 	cmd.AddCommand(newAgentInfoCmd(g))
+	cmd.AddCommand(newAgentStartCmd(g))
+	cmd.AddCommand(newAgentStopCmd(g))
+	cmd.AddCommand(newAgentRedeployCmd(g))
+	cmd.AddCommand(newAgentTailCmd(g))
 	return cmd
 }
 

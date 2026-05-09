@@ -256,13 +256,19 @@ Branch: `phase-5/host-cli`. PR + merge at phase end.
 - [x] `TASKS.md` and `CHANGELOG.md` updated.
 - [x] Local commit (PR + merge deferred until 1Password unlocked).
 
-### Deferred to Phase 5b / 6
+### Phase 5b — landed
 
-- [ ] `xpc bootstrap` end-to-end SSH deploy (currently prints manual steps + generates material).
-- [ ] `xpc agent {start,stop,redeploy,install,uninstall,startup-status,reboot}` — needs `internal/sshlife/` Go package.
-- [ ] `xpc daemon` host-side multiplex.
+- [x] `internal/sshlife` Go SSH client (Dial + Run + PutFile/PutBytes) using `golang.org/x/crypto/ssh`.
+- [x] `agent/embed.go` ships `agent.py` + `arcp.py` + `ManagePy` inside the Go binary via `//go:embed`.
+- [x] `xpc bootstrap` end-to-end: SSH deploy, restart, listener-wait, profile auto-pin.
+- [x] `xpc agent start | stop | restart | tail` drive `manage.py` over SSH; `start`/`restart` block on the listener so chained calls work.
+
+### Phase 5b — still deferred
+
+- [ ] `xpc daemon` host-side multiplex (latency win for tight loops; not blocking anything).
+- [ ] TOFU SSH host-key verification (currently `InsecureIgnoreHostKey()`).
 - [ ] Cobra arg-validation errors → exit 2 (currently fall through to 1).
-- [ ] `internal/output` formatters package (currently inlined per-command; `--output json` honored only by `xpc agent info`).
+- [ ] `internal/output` formatters package (currently inlined per-command; `--output json` honored only by `xpc agent info` + `xpc ps`).
 
 ---
 
