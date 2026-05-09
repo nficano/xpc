@@ -3,9 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/nficano/xpc/internal/output"
 )
 
 func newRegCmd(g *Globals) *cobra.Command {
@@ -37,12 +40,89 @@ func newRegGetCmd(g *Globals) *cobra.Command {
 			if recurse {
 				argv = append(argv, "/s")
 			}
-			return runRegPassthrough(cmd, g, argv, "reg query")
+			mode := output.ParseMode(g.OutputMode)
+			if mode == output.ModeText {
+				return runRegPassthrough(cmd, g, argv, "reg query")
+			}
+			return runRegQueryStructured(cmd, g, argv, mode)
 		},
 	}
 	c.Flags().StringVar(&valueName, "value", "", "Restrict output to a specific value name")
 	c.Flags().BoolVar(&recurse, "recurse", false, "Recurse into subkeys (reg query /s)")
 	return c
+}
+
+// runRegQueryStructured runs `reg query` and re-shapes its text output
+// into structured rows so --output json|table works.
+func runRegQueryStructured(cmd *cobra.Command, g *Globals, argv []string, mode output.Mode) error {
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	py := buildSubprocessPy(argv)
+	stdout, stderr, rc, err := runRemoteCmd(ctx, g, py, "python")
+	if err != nil {
+		return err
+	}
+	if err := requireSuccess(stdout, stderr, rc, "reg query"); err != nil {
+		return err
+	}
+	rows := parseRegQueryOutput(stdout)
+	if mode == output.ModeJSON {
+		return output.Encode(cmd.OutOrStdout(), mode, rows)
+	}
+	headers := []string{"KEY", "NAME", "TYPE", "DATA"}
+	tabular := make([][]any, 0, len(rows))
+	for _, r := range rows {
+		tabular = append(tabular, []any{r.Key, r.Name, r.Type, r.Data})
+	}
+	return output.EncodeRows(cmd.OutOrStdout(), mode, headers, tabular)
+}
+
+// RegEntry is a single registry value pulled from `reg query` output.
+type RegEntry struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+	Data string `json:"data"`
+}
+
+// regValueLine matches `reg query` value rows:
+//
+//	"    ProductName    REG_SZ    Microsoft Windows XP"
+//
+// where the type token is one of the canonical REG_* names.
+var regValueLine = regexp.MustCompile(`^\s+(\S(?:.*\S)?)\s{2,}(REG_(?:SZ|EXPAND_SZ|MULTI_SZ|DWORD|QWORD|BINARY|NONE))\s{2,}(.*)$`)
+
+// parseRegQueryOutput parses the textual output of `reg query`. Lines
+// beginning with HKEY_* (or HKLM/HKCU/etc. abbreviations Windows accepts)
+// are key headers; subsequent indented lines are values.
+func parseRegQueryOutput(s string) []RegEntry {
+	var (
+		entries []RegEntry
+		key     string
+	)
+	for _, raw := range strings.Split(s, "\n") {
+		line := strings.TrimRight(raw, "\r")
+		if line == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+			key = strings.TrimSpace(line)
+			continue
+		}
+		m := regValueLine.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		entries = append(entries, RegEntry{
+			Key:  key,
+			Name: strings.TrimSpace(m[1]),
+			Type: m[2],
+			Data: strings.TrimRight(m[3], " \t"),
+		})
+	}
+	return entries
 }
 
 func newRegSetCmd(g *Globals) *cobra.Command {

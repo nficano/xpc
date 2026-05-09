@@ -1,17 +1,17 @@
-# -*- coding: utf-8 -*-
 """In-process tests for the xpc agent's connection-and-dispatch layer.
 
 These tests use a `socketpair` so we can drive the agent's `Connection.serve()`
 loop without standing up a TLS listener. TLS handshake is exercised in the
 real-VM Phase 4 verification (see docs/sessions/phase-4-agent.md).
 """
-from __future__ import absolute_import
 
+import contextlib
 import os
 import socket
 import sys
 import threading
 import time
+from typing import Any
 
 import pytest
 
@@ -19,32 +19,34 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 AGENT_DIR = os.path.dirname(HERE)
 sys.path.insert(0, AGENT_DIR)
 
-import agent  # noqa: E402
 import arcp  # noqa: E402
+
+import agent  # noqa: E402
 
 PSK = b"\x00" * 32
 
 
-class Pipe(object):
-    """Bundles a socket with persistent read/write file objects.
+class Pipe:
+    """Bundle a socket with persistent read/write file objects.
 
-    socket.makefile() returns buffered file objects; each call returns a
-    distinct buffer. Calling makefile() per send/recv leaks pre-fetched
-    bytes when the buffered reader is GC'd. We keep ONE rfile/wfile per
-    socket for the duration of the test.
+    ``socket.makefile()`` returns buffered file objects; each call returns
+    a distinct buffer. Calling ``makefile()`` per send/recv leaks pre-fetched
+    bytes when the buffered reader is GC'd. We keep ONE ``rfile``/``wfile``
+    per socket for the duration of the test.
+
+    :param sock: a connected socket (e.g. one half of ``socket.socketpair``).
     """
 
-    def __init__(self, sock):
+    def __init__(self, sock: socket.socket) -> None:
         self.sock = sock
         self.rfile = sock.makefile("rb")
         self.wfile = sock.makefile("wb")
 
-    def close(self):
+    def close(self) -> None:
+        """Close the read/write file objects and the socket, ignoring errors."""
         for closer in (self.rfile, self.wfile, self.sock):
-            try:
+            with contextlib.suppress(Exception):
                 closer.close()
-            except Exception:
-                pass
 
 
 @pytest.fixture
@@ -63,13 +65,18 @@ def session():
         t.join(timeout=2)
 
 
-def _send(pipe, envelope, psk=PSK):
+def _send(pipe: Pipe, envelope: dict[str, Any], psk: bytes = PSK) -> None:
+    """Sign *envelope* with *psk* and write it as a framed message to *pipe*."""
     arcp.sign(envelope, psk)
     arcp.write_frame(pipe.wfile, envelope)
     pipe.wfile.flush()
 
 
-def _recv(pipe, psk=PSK, timeout=3.0):
+def _recv(pipe: Pipe, psk: bytes = PSK, timeout: float = 3.0) -> dict[str, Any] | None:
+    """Read one framed envelope from *pipe* and verify its signature.
+
+    :returns: the parsed envelope, or ``None`` on clean EOF.
+    """
     pipe.sock.settimeout(timeout)
     env = arcp.read_frame(pipe.rfile)
     if env is not None:
@@ -77,9 +84,13 @@ def _recv(pipe, psk=PSK, timeout=3.0):
     return env
 
 
-def _new(msg_type, payload=None, **fields):
-    e = arcp.new_envelope(
-        arcp.new_id(arcp.PREFIX_MESSAGE), msg_type, arcp.format_timestamp())
+def _new(msg_type: str, payload: dict[str, Any] | None = None, **fields: str) -> dict[str, Any]:
+    """Build a fresh envelope of *msg_type* with optional *payload* and fields.
+
+    Empty/false-y *fields* values are omitted, matching the agent's own
+    envelope-building idiom.
+    """
+    e = arcp.new_envelope(arcp.new_id(arcp.PREFIX_MESSAGE), msg_type, arcp.format_timestamp())
     if payload is not None:
         e["payload"] = payload
     for k, v in fields.items():
@@ -88,9 +99,15 @@ def _new(msg_type, payload=None, **fields):
     return e
 
 
-def _drain_until(pipe, terminal_types, timeout=3.0):
-    """Read envelopes until one of terminal_types arrives. Return the list."""
-    seen = []
+def _drain_until(
+    pipe: Pipe, terminal_types: tuple[str, ...], timeout: float = 3.0
+) -> list[dict[str, Any]]:
+    """Read envelopes from *pipe* until one of *terminal_types* arrives.
+
+    :returns: the list of envelopes received, including the terminal one if
+        seen. Returns whatever was received so far on timeout or EOF.
+    """
+    seen: list[dict[str, Any]] = []
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -105,16 +122,20 @@ def _drain_until(pipe, terminal_types, timeout=3.0):
     return seen
 
 
-# ---- Tests -----------------------------------------------------------------
-
-
 def test_session_open_returns_session_accepted(session):
     pipe, _ = session
-    open_env = _new(arcp.TYPE_SESSION_OPEN, {
-        "client": {"name": "test", "version": "0.0"},
-        "capabilities": {"streaming": True, "binary_streams": True,
-                         "durable_jobs": True, "checkpoints": True},
-    })
+    open_env = _new(
+        arcp.TYPE_SESSION_OPEN,
+        {
+            "client": {"name": "test", "version": "0.0"},
+            "capabilities": {
+                "streaming": True,
+                "binary_streams": True,
+                "durable_jobs": True,
+                "checkpoints": True,
+            },
+        },
+    )
     _send(pipe, open_env)
     resp = _recv(pipe)
     assert resp["type"] == arcp.TYPE_SESSION_ACCEPTED
@@ -129,9 +150,13 @@ def test_session_open_returns_session_accepted(session):
 
 def test_ping_returns_pong(session):
     pipe, _ = session
-    _send(pipe, _new(arcp.TYPE_SESSION_OPEN,
-                     {"client": {"name": "t", "version": "0"},
-                      "capabilities": {"streaming": True}}))
+    _send(
+        pipe,
+        _new(
+            arcp.TYPE_SESSION_OPEN,
+            {"client": {"name": "t", "version": "0"}, "capabilities": {"streaming": True}},
+        ),
+    )
     accepted = _recv(pipe)
     sid = accepted["session_id"]
 
@@ -177,9 +202,9 @@ def test_tool_invoke_unknown_tool_returns_tool_error(session):
     accepted = _recv(pipe)
     sid = accepted["session_id"]
 
-    invoke = _new(arcp.TYPE_TOOL_INVOKE,
-                  {"tool": "does.not.exist", "arguments": {}},
-                  session_id=sid)
+    invoke = _new(
+        arcp.TYPE_TOOL_INVOKE, {"tool": "does.not.exist", "arguments": {}}, session_id=sid
+    )
     _send(pipe, invoke)
 
     # Expect a tool.error followed by no job lifecycle (handler is missing
@@ -191,9 +216,44 @@ def test_tool_invoke_unknown_tool_returns_tool_error(session):
 
 def test_tool_invoke_before_session_open_is_rejected(session):
     pipe, _ = session
-    invoke = _new(arcp.TYPE_TOOL_INVOKE,
-                  {"tool": "exec", "arguments": {"cmd": "echo hi"}})
+    invoke = _new(arcp.TYPE_TOOL_INVOKE, {"tool": "exec", "arguments": {"cmd": "echo hi"}})
     _send(pipe, invoke)
+    nack = _recv(pipe)
+    assert nack["type"] == arcp.TYPE_NACK
+    assert nack["payload"]["code"] == "invalid_envelope"
+
+
+def test_tools_list_returns_descriptors(session):
+    pipe, _ = session
+    _send(pipe, _new(arcp.TYPE_SESSION_OPEN, {"capabilities": {}}))
+    accepted = _recv(pipe)
+    sid = accepted["session_id"]
+
+    req = _new(arcp.TYPE_TOOLS_LIST, session_id=sid)
+    _send(pipe, req)
+    resp = _recv(pipe)
+
+    assert resp["type"] == arcp.TYPE_TOOLS_RESULT
+    assert resp["correlation_id"] == req["id"]
+    assert resp["session_id"] == sid
+
+    tools = resp["payload"]["tools"]
+    names = [t["name"] for t in tools]
+    # Every dispatchable tool must have a descriptor.
+    for name in agent.TOOLS:
+        assert name in names, f"missing descriptor for {name}"
+
+    for descriptor in tools:
+        assert descriptor["name"] in agent.TOOLS, (
+            "descriptor names a tool that isn't registered: {}".format(descriptor["name"])
+        )
+        assert descriptor.get("description")
+        assert descriptor["input_schema"]["type"] == "object"
+
+
+def test_tools_list_before_session_open_is_rejected(session):
+    pipe, _ = session
+    _send(pipe, _new(arcp.TYPE_TOOLS_LIST))
     nack = _recv(pipe)
     assert nack["type"] == arcp.TYPE_NACK
     assert nack["payload"]["code"] == "invalid_envelope"
@@ -205,9 +265,7 @@ def test_agent_info_tool_returns_metadata(session):
     accepted = _recv(pipe)
     sid = accepted["session_id"]
 
-    invoke = _new(arcp.TYPE_TOOL_INVOKE,
-                  {"tool": "agent.info", "arguments": {}},
-                  session_id=sid)
+    invoke = _new(arcp.TYPE_TOOL_INVOKE, {"tool": "agent.info", "arguments": {}}, session_id=sid)
     _send(pipe, invoke)
     seen = _drain_until(pipe, (arcp.TYPE_JOB_COMPLETED, arcp.TYPE_JOB_FAILED))
 
@@ -243,9 +301,10 @@ def test_tool_error_is_returned_as_tool_error_envelope():
         accepted = _recv(pipe)
         sid = accepted["session_id"]
 
-        _send(pipe, _new(arcp.TYPE_TOOL_INVOKE,
-                         {"tool": "always_fails", "arguments": {}},
-                         session_id=sid))
+        _send(
+            pipe,
+            _new(arcp.TYPE_TOOL_INVOKE, {"tool": "always_fails", "arguments": {}}, session_id=sid),
+        )
         seen = _drain_until(pipe, (arcp.TYPE_JOB_FAILED, arcp.TYPE_JOB_COMPLETED))
         types = [env["type"] for env in seen]
         assert arcp.TYPE_TOOL_ERROR in types

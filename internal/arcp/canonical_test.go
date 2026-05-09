@@ -10,11 +10,11 @@ import (
 // produce byte-identical inputs to HMAC.
 func TestCanonicalSortedKeys(t *testing.T) {
 	t.Parallel()
-	v := map[string]interface{}{
+	v := map[string]any{
 		"z": 1,
-		"a": map[string]interface{}{"y": 2, "b": 3},
-		"m": []interface{}{
-			map[string]interface{}{"q": 9, "p": 8},
+		"a": map[string]any{"y": 2, "b": 3},
+		"m": []any{
+			map[string]any{"q": 9, "p": 8},
 		},
 	}
 	got, err := canonicalMarshal(v)
@@ -31,7 +31,7 @@ func TestCanonicalSortedKeys(t *testing.T) {
 // matching Python's json.dumps default (Python does not HTML-escape).
 func TestCanonicalNoHTMLEscape(t *testing.T) {
 	t.Parallel()
-	v := map[string]interface{}{"k": "<hello & 'world'>"}
+	v := map[string]any{"k": "<hello & 'world'>"}
 	got, err := canonicalMarshal(v)
 	if err != nil {
 		t.Fatalf("canonicalMarshal: %v", err)
@@ -52,7 +52,7 @@ func TestCanonicalNoHTMLEscape(t *testing.T) {
 // TestCanonicalNoTrailingNewline ensures the encoder's trailing '\n' is stripped.
 func TestCanonicalNoTrailingNewline(t *testing.T) {
 	t.Parallel()
-	got, err := canonicalMarshal(map[string]interface{}{"k": "v"})
+	got, err := canonicalMarshal(map[string]any{"k": "v"})
 	if err != nil {
 		t.Fatalf("canonicalMarshal: %v", err)
 	}

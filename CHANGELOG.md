@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Backlog cleanup (post-Phase 7)**: closed out the long tail of deferred
+  items.
+  - **`go install` support**: confirmed the layout supports
+    `go install github.com/nficano/xpc/cmd/xpc@latest`; documented in
+    `README.md`.
+  - **`argv[0]` shims** (`internal/cli/shim.go`): invoking the binary as
+    `xpcexec` / `xpcreg` / `xpcps` / etc. dispatches to the matching
+    subcommand. Symlink to wire it up.
+  - **`internal/output` formatters package**: `Encode`, `EncodeRows`,
+    `EncodeKV`, `ParseMode`. `xpc ps` and `xpc agent info` migrated to
+    it; `xpc reg get` now honors `--output {text|json|table}`.
+  - **`xpc reg get --output json|table`**: parses `reg query` text into
+    structured `{key,name,type,data}` rows.
+  - **`xpc svc install`/`uninstall`**: `sc create` wrapper with
+    `--display-name`, `--start`, `--account`, `--password`, `--depends`;
+    `sc delete` (with `--stop` first by default).
+  - **`xpc evt tail`**: `tail -f`-style polling loop over
+    `eventquery.vbs`; dedupes per-record so only fresh entries print
+    after the first poll.
+  - **`xpc py repl`**: persistent interactive Python REPL on the VM via
+    a new `py.repl` agent tool. The agent spawns `python -i -u` and
+    pumps stdin/stdout/stderr through bidirectional ARCP streams.
+  - **`xpc cp` chunked transfer (>30 MB)**: files larger than
+    `cpInlineLimit` are split into 8 MB chunks; SHA-256 verified on both
+    sides; atomic `.xpc.tmp` + rename. Both upload and download.
+  - **`xpc tun -R vmPort:hostHost:hostPort`**: reverse forwarding via a
+    new `tun.reverse` agent tool. The agent opens a VM-side listener;
+    each accepted connection emits `stream.open channel="reverse_up"`
+    with a fresh `conn_id`, and the host responds with
+    `stream.open channel="reverse_down"` carrying the same `conn_id`.
+    Bytes shuttle in both directions over the paired streams. The
+    agent's `Connection._dispatch` now also handles inbound
+    `stream.open` envelopes for downstream registration.
+  - **TASKS.md** brought back in sync with the actual code.
+
 - **Phase 6d — RE-server lifecycle (`xpc ghidra`, `xpc ida`)**:
   - `xpc ghidra start [--binary] [--port] [--repo]` /
     `xpc ghidra stop`: detached-spawn `ghidraSvr.bat` (default

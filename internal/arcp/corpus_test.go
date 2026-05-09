@@ -85,12 +85,12 @@ type corpusFile struct {
 }
 
 type corpusCorpusTestCase struct {
-	Name         string                 `json:"name"`
-	Description  string                 `json:"description"`
-	Envelope     map[string]interface{} `json:"envelope"`
-	CanonicalHex string                 `json:"canonical_hex"`
-	SigHex       string                 `json:"sig_hex"`
-	FramedHex    string                 `json:"framed_hex"`
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
+	Envelope     map[string]any `json:"envelope"`
+	CanonicalHex string         `json:"canonical_hex"`
+	SigHex       string         `json:"sig_hex"`
+	FramedHex    string         `json:"framed_hex"`
 }
 
 func loadCorpus(t *testing.T) *corpusFile {
@@ -121,7 +121,7 @@ func loadCorpus(t *testing.T) *corpusFile {
 	return &c
 }
 
-func envelopeFromMap(t *testing.T, m map[string]interface{}) *Envelope {
+func envelopeFromMap(t *testing.T, m map[string]any) *Envelope {
 	t.Helper()
 	// Round-trip through JSON to populate the typed Envelope struct.
 	b, err := json.Marshal(m)
@@ -133,7 +133,7 @@ func envelopeFromMap(t *testing.T, m map[string]interface{}) *Envelope {
 		t.Fatalf("unmarshal envelope: %v", err)
 	}
 	if e.Payload == nil {
-		e.Payload = map[string]interface{}{}
+		e.Payload = map[string]any{}
 	}
 	// Sanity: corpus envelopes always have sig=""; Sign should fill it.
 	if e.Auth.Sig != "" {

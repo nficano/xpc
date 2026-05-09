@@ -35,6 +35,17 @@ docs/           # design docs and RFC snapshot
 tests/          # integration + real-VM test fixtures
 ```
 
+## Install
+
+Requires Go 1.25+.
+
+```bash
+go install github.com/nficano/xpc/cmd/xpc@latest
+```
+
+This drops the `xpc` binary into `$(go env GOBIN)` (or `$(go env GOPATH)/bin`).
+Pin a specific release with `@vX.Y.Z` instead of `@latest`.
+
 ## Development (placeholder)
 
 ```bash

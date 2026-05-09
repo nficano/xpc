@@ -10,16 +10,16 @@ import (
 // and no HTML escaping (so '<', '>', '&' stay as-is). The result must be
 // byte-identical between Go and Python to keep HMAC signatures consistent.
 //
-// Implementation: marshal -> unmarshal into interface{} -> marshal again. The
-// second marshal pass operates on map[string]interface{} values, which the
+// Implementation: marshal -> unmarshal into any -> marshal again. The
+// second marshal pass operates on map[string]any values, which the
 // stdlib serializes with sorted keys.
-func canonicalMarshal(v interface{}) ([]byte, error) {
+func canonicalMarshal(v any) ([]byte, error) {
 	first, err := jsonMarshalNoHTMLEscape(v)
 	if err != nil {
 		return nil, err
 	}
 
-	var generic interface{}
+	var generic any
 	if err := json.Unmarshal(first, &generic); err != nil {
 		return nil, fmt.Errorf("arcp: canonical roundtrip unmarshal: %w", err)
 	}
@@ -27,7 +27,7 @@ func canonicalMarshal(v interface{}) ([]byte, error) {
 	return jsonMarshalNoHTMLEscape(generic)
 }
 
-func jsonMarshalNoHTMLEscape(v interface{}) ([]byte, error) {
+func jsonMarshalNoHTMLEscape(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)

@@ -27,12 +27,12 @@ const fixedTimestamp = "2026-05-08T18:21:00.123456Z"
 var fixedPSK = bytes.Repeat([]byte{0}, 32)
 
 type corpusCase struct {
-	Name         string                 `json:"name"`
-	Description  string                 `json:"description"`
-	Envelope     map[string]interface{} `json:"envelope"`
-	CanonicalHex string                 `json:"canonical_hex"`
-	SigHex       string                 `json:"sig_hex"`
-	FramedHex    string                 `json:"framed_hex"`
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
+	Envelope     map[string]any `json:"envelope"`
+	CanonicalHex string         `json:"canonical_hex"`
+	SigHex       string         `json:"sig_hex"`
+	FramedHex    string         `json:"framed_hex"`
 }
 
 type corpus struct {
@@ -62,15 +62,15 @@ func main() {
 			env: func() *arcp.Envelope {
 				e := arcp.New("msg_01session1234567890abcdef", arcp.TypeSessionOpen, fixedTimestamp)
 				e.TraceID = "tr_01trace0000000000000000ab"
-				e.Payload = map[string]interface{}{
-					"capabilities": map[string]interface{}{
+				e.Payload = map[string]any{
+					"capabilities": map[string]any{
 						"agent_handoff":  false,
 						"binary_streams": true,
 						"checkpoints":    false,
 						"durable_jobs":   false,
 						"streaming":      true,
 					},
-					"client": map[string]interface{}{
+					"client": map[string]any{
 						"name":    "xpc",
 						"version": "0.0.0-dev",
 					},
@@ -85,9 +85,9 @@ func main() {
 				e := arcp.New("msg_01invoke12345678901234ab", arcp.TypeToolInvoke, fixedTimestamp)
 				e.SessionID = "sess_01session1234567890abcdef"
 				e.TraceID = "tr_01trace0000000000000000ab"
-				e.Payload = map[string]interface{}{
+				e.Payload = map[string]any{
 					"tool": "exec",
-					"arguments": map[string]interface{}{
+					"arguments": map[string]any{
 						"cmd":     "dir 'C:\\'",
 						"shell":   "cmd",
 						"timeout": float64(30),
@@ -105,7 +105,7 @@ func main() {
 				e.JobID = "job_01job12345678901234567a"
 				e.StreamID = "str_01stream0000000000000ab"
 				e.CorrelationID = "msg_01invoke12345678901234ab"
-				e.Payload = map[string]interface{}{
+				e.Payload = map[string]any{
 					"delta": "Volume in drive C is...\r\n",
 				}
 				return e
@@ -119,10 +119,48 @@ func main() {
 				e.SessionID = "sess_01session1234567890abcdef"
 				e.JobID = "job_01job12345678901234567a"
 				e.CorrelationID = "msg_01invoke12345678901234ab"
-				e.Payload = map[string]interface{}{
+				e.Payload = map[string]any{
 					"code":      "EXEC_FAILED",
 					"message":   "exit code 1",
 					"retryable": false,
+				}
+				return e
+			}(),
+		},
+		{
+			name: "tools.list",
+			desc: "client requests the agent's tool catalog",
+			env: func() *arcp.Envelope {
+				e := arcp.New("msg_01toolslist00000000000a", arcp.TypeToolsList, fixedTimestamp)
+				e.SessionID = "sess_01session1234567890abcdef"
+				e.TraceID = "tr_01trace0000000000000000ab"
+				return e
+			}(),
+		},
+		{
+			name: "tools.list.result",
+			desc: "agent returns descriptors for its registered tools",
+			env: func() *arcp.Envelope {
+				e := arcp.New("msg_01toolsresult000000000a", arcp.TypeToolsResult, fixedTimestamp)
+				e.SessionID = "sess_01session1234567890abcdef"
+				e.CorrelationID = "msg_01toolslist00000000000a"
+				e.TraceID = "tr_01trace0000000000000000ab"
+				e.Payload = map[string]any{
+					"tools": []any{
+						map[string]any{
+							"name":        "exec",
+							"description": "Run a command on the VM and stream stdout/stderr.",
+							"input_schema": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"cmd":     map[string]any{"type": "string"},
+									"shell":   map[string]any{"type": "string", "enum": []any{"cmd", "python", "python_file"}},
+									"timeout": map[string]any{"type": "integer", "minimum": float64(0)},
+								},
+								"required": []any{"cmd"},
+							},
+						},
+					},
 				}
 				return e
 			}(),
@@ -132,7 +170,7 @@ func main() {
 			desc: "payload containing < > & to test no-HTML-escape parity",
 			env: func() *arcp.Envelope {
 				e := arcp.New("msg_01htmlchar0000000000ab", arcp.TypeLog, fixedTimestamp)
-				e.Payload = map[string]interface{}{
+				e.Payload = map[string]any{
 					"level":   "info",
 					"message": "<rendered & 'safe'>",
 				}
@@ -201,23 +239,23 @@ func canonicalForCorpus(e *arcp.Envelope) ([]byte, error) {
 	return clone.Marshal()
 }
 
-func envelopeToMap(e *arcp.Envelope) (map[string]interface{}, error) {
+func envelopeToMap(e *arcp.Envelope) (map[string]any, error) {
 	b, err := e.Marshal()
 	if err != nil {
 		return nil, err
 	}
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal(b, &m); err != nil {
 		return nil, err
 	}
 	// Blank out the sig in the "envelope" view so consumers must re-sign.
-	if auth, ok := m["auth"].(map[string]interface{}); ok {
+	if auth, ok := m["auth"].(map[string]any); ok {
 		auth["sig"] = ""
 	}
 	return m, nil
 }
 
-func fail(format string, args ...interface{}) {
+func fail(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "gen-corpus: "+format+"\n", args...)
 	os.Exit(1)
 }

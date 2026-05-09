@@ -1,0 +1,51 @@
+[tool.ruff]
+# ruff's minimum supported target is py37; the on-VM agent files
+# (agent/agent.py, agent/arcp.py, agent/scripts/echo_server.py) target
+# Python 3.4 because they run on Windows XP. We disable pyupgrade ("UP")
+# and modern-syntax rules for those files via per-file-ignores below.
+target-version = "py37"
+line-length = 100
+extend-exclude = [".venv", "bin", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "D", "RUF"]
+# D203/D213 conflict with D211/D212 (we keep the latter).
+# D107: __init__ docstring not required (we document classes themselves).
+# D105: magic-method docstrings not required.
+ignore = ["D203", "D213", "D107", "D105"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+# On-VM agent files target Python 3.4: no f-strings, no type hints in
+# signatures, no walrus, no PEP 585 generics. Disable rules that would
+# rewrite those constructs.
+"agent/agent.py" = ["UP", "SIM"]
+"agent/arcp.py" = ["UP", "SIM", "N818"]
+"agent/scripts/echo_server.py" = ["UP", "SIM"]
+# Tests don't need full docstring coverage; assertions are documentation.
+"agent/tests/*.py" = ["D100", "D101", "D102", "D103", "D104"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["agent/tests"]
+# Strict mode is impractical here: agent.py and arcp.py are Python-3.4-bound
+# and have no type annotations, so every call from a test into them counts
+# as a "call to untyped function." We keep mypy as a sanity check (catches
+# real type bugs in helpers and fixtures) without demanding exhaustive
+# annotation coverage on test bodies.
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+exclude = ["agent/agent\\.py$", "agent/arcp\\.py$", "agent/scripts/.*"]
+
+[[tool.mypy.overrides]]
+module = ["arcp", "agent"]
+ignore_missing_imports = true
+
+[tool.pydocstyle]
+convention = "pep257"
+match_dir = "agent"
+match = "(?!test_).*\\.py"
+add-ignore = ["D107", "D105"]

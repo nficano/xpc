@@ -15,6 +15,7 @@ that runs on Windows XP). Do NOT use:
   * pathlib.Path nice-to-haves only on 3.6+
 Stick to .format() / % formatting, return-type via docstrings, and stdlib only.
 """
+
 from __future__ import absolute_import, print_function
 
 import base64
@@ -25,8 +26,6 @@ import hmac
 import json
 import os
 import struct
-
-# ---- Constants -------------------------------------------------------------
 
 VERSION = "1.0"
 MAX_ENVELOPE_BYTES = 50 * 1024 * 1024
@@ -57,6 +56,8 @@ TYPE_PERMISSION_DENY = "permission.deny"
 TYPE_TOOL_INVOKE = "tool.invoke"
 TYPE_TOOL_RESULT = "tool.result"
 TYPE_TOOL_ERROR = "tool.error"
+TYPE_TOOLS_LIST = "tools.list"
+TYPE_TOOLS_RESULT = "tools.list.result"
 TYPE_JOB_ACCEPTED = "job.accepted"
 TYPE_JOB_STARTED = "job.started"
 TYPE_JOB_PROGRESS = "job.progress"
@@ -74,22 +75,47 @@ TYPE_STREAM_ERROR = "stream.error"
 TYPE_LOG = "log"
 
 ALL_TYPES = (
-    TYPE_SESSION_OPEN, TYPE_SESSION_ACCEPTED, TYPE_SESSION_CLOSE,
-    TYPE_PING, TYPE_PONG, TYPE_ACK, TYPE_NACK, TYPE_CANCEL,
-    TYPE_PERMISSION_REQ, TYPE_PERMISSION_GRANT, TYPE_PERMISSION_DENY,
-    TYPE_TOOL_INVOKE, TYPE_TOOL_RESULT, TYPE_TOOL_ERROR,
-    TYPE_JOB_ACCEPTED, TYPE_JOB_STARTED, TYPE_JOB_PROGRESS,
-    TYPE_JOB_COMPLETED, TYPE_JOB_FAILED, TYPE_JOB_CANCELLED,
-    TYPE_STREAM_OPEN, TYPE_STREAM_CHUNK, TYPE_STREAM_CLOSE, TYPE_STREAM_ERROR,
+    TYPE_SESSION_OPEN,
+    TYPE_SESSION_ACCEPTED,
+    TYPE_SESSION_CLOSE,
+    TYPE_PING,
+    TYPE_PONG,
+    TYPE_ACK,
+    TYPE_NACK,
+    TYPE_CANCEL,
+    TYPE_PERMISSION_REQ,
+    TYPE_PERMISSION_GRANT,
+    TYPE_PERMISSION_DENY,
+    TYPE_TOOL_INVOKE,
+    TYPE_TOOL_RESULT,
+    TYPE_TOOL_ERROR,
+    TYPE_TOOLS_LIST,
+    TYPE_TOOLS_RESULT,
+    TYPE_JOB_ACCEPTED,
+    TYPE_JOB_STARTED,
+    TYPE_JOB_PROGRESS,
+    TYPE_JOB_COMPLETED,
+    TYPE_JOB_FAILED,
+    TYPE_JOB_CANCELLED,
+    TYPE_STREAM_OPEN,
+    TYPE_STREAM_CHUNK,
+    TYPE_STREAM_CLOSE,
+    TYPE_STREAM_ERROR,
     TYPE_LOG,
 )
 
 # Optional envelope fields (omitted when empty/None per docs/PROTOCOL.md).
 _OPTIONAL_FIELDS = (
-    "session_id", "job_id", "stream_id",
-    "trace_id", "span_id", "parent_span_id",
-    "correlation_id", "causation_id",
-    "source", "target",
+    "session_id",
+    "job_id",
+    "stream_id",
+    "trace_id",
+    "span_id",
+    "parent_span_id",
+    "correlation_id",
+    "causation_id",
+    "source",
+    "target",
 )
 
 # Crockford-like base32 alphabet matching Go's base32 encoder
@@ -104,8 +130,6 @@ _CROCKFORD_TRANS = str.maketrans(
 )
 
 
-# ---- Errors ----------------------------------------------------------------
-
 class ProtocolError(Exception):
     """Generic protocol error (auth failure, malformed envelope, etc.)."""
 
@@ -113,8 +137,6 @@ class ProtocolError(Exception):
 class TooLarge(ProtocolError):
     """Frame exceeds MAX_ENVELOPE_BYTES."""
 
-
-# ---- Envelope construction -------------------------------------------------
 
 def new_envelope(envelope_id, msg_type, timestamp):
     """Return a fresh envelope dict with required fields set.
@@ -158,14 +180,12 @@ def validate(envelope):
         raise ProtocolError("nil payload (use {} for empty)")
 
 
-# ---- Canonicalization ------------------------------------------------------
-
 def canonical_marshal(value):
-    """Marshal *value* to JSON bytes with sorted keys, no whitespace, no HTML
-    escape, and ensure_ascii=False.
+    """Marshal *value* to canonical JSON bytes.
 
-    The output is byte-identical to Go's internal/arcp canonicalMarshal for
-    the same input.
+    Sorted keys, no whitespace, no HTML escape, ``ensure_ascii=False``.
+    The output is byte-identical to Go's ``internal/arcp`` ``canonicalMarshal``
+    for the same input.
     """
     # sort_keys=True sorts at every nesting level.
     # separators=(',', ':') strips all whitespace.
@@ -182,8 +202,11 @@ def canonical_marshal(value):
 
 
 def _strip_empty_optionals(envelope):
-    """Return a copy of envelope with optional fields removed when empty,
-    matching Go's omitempty behavior."""
+    """Return a copy of *envelope* with empty optional fields removed.
+
+    Mirrors Go's ``omitempty`` behavior on the fields listed in
+    :data:`_OPTIONAL_FIELDS`.
+    """
     out = {}
     for key, val in envelope.items():
         if key in _OPTIONAL_FIELDS and (val is None or val == ""):
@@ -195,15 +218,18 @@ def _strip_empty_optionals(envelope):
 def _deep_copy(value):
     """Stdlib-only deep copy avoiding the copy module's overhead."""
     if isinstance(value, dict):
-        return dict((k, _deep_copy(v)) for k, v in value.items())
+        return {k: _deep_copy(v) for k, v in value.items()}
     if isinstance(value, list):
         return [_deep_copy(v) for v in value]
     return value
 
 
 def canonical_signing_input(envelope):
-    """Return the bytes that HMAC is computed over: the envelope with
-    auth.sig replaced by the empty string, sorted-key JSON, no whitespace.
+    """Return the bytes that HMAC is computed over.
+
+    The envelope's ``auth.sig`` is replaced with the empty string, optional
+    fields are stripped, and the result is canonical-marshalled (sorted
+    keys, no whitespace).
     """
     clone = _deep_copy(envelope)
     if "auth" not in clone or not isinstance(clone["auth"], dict):
@@ -212,11 +238,11 @@ def canonical_signing_input(envelope):
     return canonical_marshal(_strip_empty_optionals(clone))
 
 
-# ---- Sign / verify ---------------------------------------------------------
-
 def sign(envelope, psk):
-    """Compute HMAC-SHA256 and store lowercase-hex digest in
-    envelope['auth']['sig']. Mutates and returns envelope.
+    """Compute HMAC-SHA256 over *envelope* and stamp the signature in place.
+
+    The lowercase-hex digest is stored in ``envelope['auth']['sig']``.
+    Mutates and returns *envelope*.
     """
     if not psk:
         raise ProtocolError("sign: empty psk")
@@ -228,8 +254,10 @@ def sign(envelope, psk):
 
 
 def verify_sig(envelope, psk):
-    """Recompute HMAC-SHA256 and constant-time compare against envelope sig.
-    Raises ProtocolError on any failure. Returns None on success.
+    """Recompute HMAC-SHA256 and constant-time compare against the envelope sig.
+
+    :returns: ``None`` on success.
+    :raises ProtocolError: on any verification failure.
     """
     if not psk:
         raise ProtocolError("verify: empty psk")
@@ -243,15 +271,13 @@ def verify_sig(envelope, psk):
         raise ProtocolError("verify: empty sig")
     try:
         got = binascii.unhexlify(sig_hex)
-    except (TypeError, binascii.Error):
-        raise ProtocolError("verify: invalid hex sig")
+    except (TypeError, binascii.Error) as exc:
+        raise ProtocolError("verify: invalid hex sig") from exc
     canon = canonical_signing_input(envelope)
     expected = hmac.new(psk, canon, hashlib.sha256).digest()
     if not hmac.compare_digest(expected, got):
         raise ProtocolError("verify: signature mismatch")
 
-
-# ---- Framing ---------------------------------------------------------------
 
 def write_frame(stream, envelope):
     """Encode and length-prefix-write the envelope to *stream*.
@@ -286,8 +312,12 @@ def read_frame(stream):
 
 
 def read_raw(stream):
-    """Read framing header and body bytes. Returns body on success, None on
-    clean EOF before any bytes are read. Raises TooLarge on overlength.
+    """Read the framing header and the body bytes.
+
+    :returns: the body bytes on success, or ``None`` on clean EOF before any
+        bytes are read.
+    :raises TooLarge: when the declared length exceeds
+        :data:`MAX_ENVELOPE_BYTES`.
     """
     hdr = _read_exact(stream, 4)
     if hdr is None:
@@ -316,8 +346,6 @@ def _read_exact(stream, n):
     return b"".join(chunks)
 
 
-# ---- ID generation ---------------------------------------------------------
-
 def new_id(prefix):
     """Generate a fresh envelope id under prefix (e.g. PREFIX_MESSAGE).
 
@@ -330,17 +358,19 @@ def new_id(prefix):
 
 
 def _crockford_encode(data):
-    """Encode bytes as 26-char base32 in our Crockford-like alphabet,
-    matching Go's base32.NewEncoding(_CROCKFORD_ALPHABET).WithPadding(NoPadding).
+    """Encode bytes as 26-char base32 in our Crockford-like alphabet.
+
+    Matches Go's
+    ``base32.NewEncoding(_CROCKFORD_ALPHABET).WithPadding(NoPadding)``.
     """
     return base64.b32encode(data).decode("ascii").rstrip("=").translate(_CROCKFORD_TRANS)
 
 
-# ---- Timestamps ------------------------------------------------------------
-
 def format_timestamp(dt=None):
-    """Return RFC 3339 / ISO 8601 timestamp with microsecond precision and
-    trailing Z. UTC. Matches Go internal/arcp.FormatTimestamp.
+    """Return an RFC 3339 / ISO 8601 timestamp string in UTC.
+
+    Microsecond precision with trailing ``Z``. Matches
+    ``Go internal/arcp.FormatTimestamp``.
     """
     if dt is None:
         dt = datetime.datetime.utcnow()

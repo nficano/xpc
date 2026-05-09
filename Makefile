@@ -33,7 +33,7 @@ tidy: ## Run go mod tidy.
 	$(GO) mod tidy
 
 clean: ## Remove build artifacts.
-	rm -rf $(BIN_DIR)/ dist/ coverage.out coverage.html
+	rm -rf $(BIN_DIR)/ dist/ coverage.out coverage.htmlot
 
 run: build ## Build and run the xpc binary.
 	./$(BIN_DIR)/xpc $(ARGS)

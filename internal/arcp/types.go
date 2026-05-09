@@ -20,6 +20,8 @@ const (
 	TypeToolInvoke   = "tool.invoke"
 	TypeToolResult   = "tool.result"
 	TypeToolError    = "tool.error"
+	TypeToolsList    = "tools.list"
+	TypeToolsResult  = "tools.list.result"
 	TypeJobAccepted  = "job.accepted"
 	TypeJobStarted   = "job.started"
 	TypeJobProgress  = "job.progress"
@@ -54,6 +56,7 @@ var AllTypes = []string{
 	TypePing, TypePong, TypeAck, TypeNack, TypeCancel,
 	TypePermissionReq, TypePermissionGrant, TypePermissionDeny,
 	TypeToolInvoke, TypeToolResult, TypeToolError,
+	TypeToolsList, TypeToolsResult,
 	TypeJobAccepted, TypeJobStarted, TypeJobProgress,
 	TypeJobCompleted, TypeJobFailed, TypeJobCancelled,
 	TypeStreamOpen, TypeStreamChunk, TypeStreamClose, TypeStreamError,

@@ -272,6 +272,25 @@ Payload:
 }
 ```
 
+#### `tools.list`
+Payload: `{}`. Sent inside an established session to ask the agent to enumerate every tool registered with its dispatcher. The response is a single `tools.list.result` whose `correlation_id` points at this message's `id`.
+
+#### `tools.list.result`
+Payload:
+```json
+{
+  "tools": [
+    {
+      "name":         "exec",
+      "description":  "Run a command on the VM and stream stdout/stderr.",
+      "input_schema": { /* JSON Schema describing tool.invoke arguments */ }
+    }
+  ]
+}
+```
+
+Each entry in `tools` is an ARCP **capability descriptor**. `name` matches what `tool.invoke` accepts in `payload.tool`. `input_schema` is JSON Schema (Draft 2020-12 subset) describing the structure of the matching `payload.arguments`. Bridges that adapt ARCP to MCP MAY pass `input_schema` through unchanged as MCP's `inputSchema`. Senders that don't recognize a descriptor MUST skip it without erroring.
+
 #### `job.accepted` / `job.started` / `job.progress` / `job.completed` / `job.failed` / `job.cancelled`
 Standard job lifecycle. Payloads are job-state-specific; see ARCP RFC §9.
 

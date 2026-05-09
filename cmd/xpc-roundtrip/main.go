@@ -62,14 +62,14 @@ func main() {
 	}{
 		{"ping", arcp.TypePing, nil},
 		{"session.open", arcp.TypeSessionOpen, func(e *arcp.Envelope) {
-			e.Payload["capabilities"] = map[string]interface{}{
+			e.Payload["capabilities"] = map[string]any{
 				"streaming":      true,
 				"binary_streams": true,
 			}
 		}},
 		{"tool.invoke", arcp.TypeToolInvoke, func(e *arcp.Envelope) {
 			e.Payload["tool"] = "exec"
-			e.Payload["arguments"] = map[string]interface{}{
+			e.Payload["arguments"] = map[string]any{
 				"cmd": "dir 'C:\\'",
 			}
 		}},

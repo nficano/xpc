@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Phase 3 echo server (Python 3.4-compatible).
+r"""Phase 3 echo server (Python 3.4-compatible).
 
 Reads ARCP envelopes over TLS, verifies HMAC, and echoes them back with the
 id and type suffixed by '.echo'. This is a one-shot verification stub used
@@ -7,13 +7,14 @@ to prove the wire protocol works on the real XP VM. Phase 4 replaces it
 with a real agent that actually dispatches tools.
 
 Usage:
-    python C:\\xpc\\echo_server.py --port 9579 \\
-        --cert C:\\xpc\\server.crt --key C:\\xpc\\server.key \\
-        --psk-file C:\\xpc\\psk.hex
+    python C:\xpc\echo_server.py --port 9579 \
+        --cert C:\xpc\server.crt --key C:\xpc\server.key \
+        --psk-file C:\xpc\psk.hex
 
 PSK file: lowercase-hex-encoded 32 bytes (matches what xpc bootstrap will
 produce in Phase 4). Exactly 64 hex characters, optional trailing newline.
 """
+
 from __future__ import absolute_import, print_function
 
 import argparse
@@ -73,6 +74,7 @@ def serve_one_client(tls_conn, psk):
 
 
 def main():
+    """CLI entry point: parse args and run the TLS echo accept loop."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=9579)
     parser.add_argument("--bind", default="0.0.0.0")
@@ -88,7 +90,9 @@ def main():
 
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
     ctx.load_cert_chain(args.cert, args.key)
-    ctx.set_ciphers("ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256")
+    ctx.set_ciphers(
+        "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256"
+    )
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

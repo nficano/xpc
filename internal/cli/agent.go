@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nficano/xpc/internal/arcp"
+	"github.com/nficano/xpc/internal/output"
 )
 
 func newAgentCmd(g *Globals) *cobra.Command {
@@ -47,7 +47,7 @@ func newAgentPingCmd(g *Globals) *cobra.Command {
 
 			ping := arcp.New(arcp.MustNewID(arcp.PrefixMessage), arcp.TypePing, arcp.FormatTimestamp(time.Now()))
 			ping.SessionID = sid
-			ping.Payload = map[string]interface{}{}
+			ping.Payload = map[string]any{}
 			if err := arcp.Sign(ping, p.PSK); err != nil {
 				return err
 			}
@@ -90,9 +90,9 @@ func newAgentInfoCmd(g *Globals) *cobra.Command {
 
 			invoke := arcp.New(arcp.MustNewID(arcp.PrefixMessage), arcp.TypeToolInvoke, arcp.FormatTimestamp(time.Now()))
 			invoke.SessionID = sid
-			invoke.Payload = map[string]interface{}{
+			invoke.Payload = map[string]any{
 				"tool":      "agent.info",
-				"arguments": map[string]interface{}{},
+				"arguments": map[string]any{},
 			}
 			if err := arcp.Sign(invoke, p.PSK); err != nil {
 				return err
@@ -106,7 +106,7 @@ func newAgentInfoCmd(g *Globals) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			var info map[string]interface{}
+			var info map[string]any
 			for {
 				env, err := readSignedFrame(conn, p.PSK, 5*time.Second)
 				if err != nil {
@@ -141,29 +141,29 @@ func newAgentInfoCmd(g *Globals) *cobra.Command {
 	}
 }
 
-func printInfo(cmd *cobra.Command, info map[string]interface{}, mode string) error {
-	if mode == "json" {
-		enc := json.NewEncoder(cmd.OutOrStdout())
-		enc.SetIndent("", "  ")
-		return enc.Encode(info)
+func printInfo(cmd *cobra.Command, info map[string]any, mode string) error {
+	m := output.ParseMode(mode)
+	if m == output.ModeJSON {
+		return output.Encode(cmd.OutOrStdout(), m, info)
 	}
-	if agent, ok := info["agent"].(map[string]interface{}); ok {
-		cmd.Printf("agent:    %s v%s\n", agent["name"], agent["version"])
+	pairs := make([]output.KV, 0, len(info)+3)
+	if agent, ok := info["agent"].(map[string]any); ok {
+		pairs = append(pairs, output.KV{Key: "agent", Value: fmt.Sprintf("%s v%s", agent["name"], agent["version"])})
 		if py, ok := agent["python"].(string); ok && py != "" {
-			cmd.Printf("python:   %s\n", py)
+			pairs = append(pairs, output.KV{Key: "python", Value: py})
 		}
 		if pid, ok := agent["pid"].(float64); ok {
-			cmd.Printf("pid:      %d\n", int(pid))
+			pairs = append(pairs, output.KV{Key: "pid", Value: int(pid)})
 		}
 	}
 	if uptime, ok := info["uptime_seconds"].(float64); ok {
-		cmd.Printf("uptime:   %s\n", time.Duration(uptime*float64(time.Second)).Truncate(time.Second))
+		pairs = append(pairs, output.KV{Key: "uptime", Value: time.Duration(uptime * float64(time.Second)).Truncate(time.Second)})
 	}
 	for k, v := range info {
 		if k == "agent" || k == "uptime_seconds" {
 			continue
 		}
-		cmd.Printf("%-9s %v\n", k+":", strings.TrimSpace(fmt.Sprint(v)))
+		pairs = append(pairs, output.KV{Key: k, Value: strings.TrimSpace(fmt.Sprint(v))})
 	}
-	return nil
+	return output.EncodeKV(cmd.OutOrStdout(), m, pairs)
 }

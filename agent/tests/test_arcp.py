@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for agent.arcp.
 
 These tests run on the host's modern Python (3.x) but exercise the
@@ -6,11 +5,11 @@ These tests run on the host's modern Python (3.x) but exercise the
 sign/verify, framing, and ID generation. Corpus parity with Go is in a
 separate test file (test_corpus.py).
 """
-from __future__ import absolute_import
 
 import io
 import os
 import sys
+from typing import Any
 
 import pytest
 
@@ -22,11 +21,11 @@ sys.path.insert(0, AGENT_DIR)
 
 import arcp  # noqa: E402
 
-
 PSK = b"\x00" * 32
 
 
-def sample_envelope():
+def sample_envelope() -> dict[str, Any]:
+    """Build a deterministic ping envelope for sign/verify tests."""
     return arcp.new_envelope(
         envelope_id="msg_01habcdef1234567890abcdef",
         msg_type=arcp.TYPE_PING,
@@ -42,16 +41,19 @@ def test_new_envelope_has_required_fields():
     arcp.validate(e)
 
 
-@pytest.mark.parametrize("mut,expect_substr", [
-    (lambda e: e.update(arcp=""), "unsupported arcp version"),
-    (lambda e: e.update(arcp="9.9"), "unsupported arcp version"),
-    (lambda e: e.update(id=""), "empty envelope id"),
-    (lambda e: e.update(type=""), "empty envelope type"),
-    (lambda e: e.update(timestamp=""), "empty timestamp"),
-    (lambda e: e["auth"].update(alg="MD5"), "unsupported auth alg"),
-    (lambda e: e["auth"].update(kid="v99"), "unsupported auth kid"),
-    (lambda e: e.update(payload=None), "nil payload"),
-])
+@pytest.mark.parametrize(
+    "mut,expect_substr",
+    [
+        (lambda e: e.update(arcp=""), "unsupported arcp version"),
+        (lambda e: e.update(arcp="9.9"), "unsupported arcp version"),
+        (lambda e: e.update(id=""), "empty envelope id"),
+        (lambda e: e.update(type=""), "empty envelope type"),
+        (lambda e: e.update(timestamp=""), "empty timestamp"),
+        (lambda e: e["auth"].update(alg="MD5"), "unsupported auth alg"),
+        (lambda e: e["auth"].update(kid="v99"), "unsupported auth kid"),
+        (lambda e: e.update(payload=None), "nil payload"),
+    ],
+)
 def test_validate_rejects_missing_fields(mut, expect_substr):
     e = sample_envelope()
     mut(e)
@@ -157,6 +159,7 @@ def test_write_frame_includes_length_prefix():
     wire = buf.getvalue()
     assert len(wire) >= 4
     import struct as _s
+
     declared = _s.unpack("!I", wire[:4])[0]
     assert declared == len(wire) - 4
 
@@ -180,14 +183,19 @@ def test_partial_read_handled():
     wire = buf.getvalue()
 
     class OneByteReader:
-        def __init__(self, src):
+        """Stream that hands out one byte per ``read`` call.
+
+        Forces the framing reader to handle short reads / partial chunks.
+        """
+
+        def __init__(self, src: bytes) -> None:
             self.src = src
             self.pos = 0
 
-        def read(self, n):
+        def read(self, n: int) -> bytes:
             if self.pos >= len(self.src):
                 return b""
-            chunk = self.src[self.pos:self.pos + 1]
+            chunk = self.src[self.pos : self.pos + 1]
             self.pos += 1
             return chunk
 
@@ -196,11 +204,17 @@ def test_partial_read_handled():
 
 
 def test_new_id_format():
-    for prefix in (arcp.PREFIX_MESSAGE, arcp.PREFIX_SESSION, arcp.PREFIX_JOB,
-                   arcp.PREFIX_STREAM, arcp.PREFIX_TRACE, arcp.PREFIX_SPAN):
+    for prefix in (
+        arcp.PREFIX_MESSAGE,
+        arcp.PREFIX_SESSION,
+        arcp.PREFIX_JOB,
+        arcp.PREFIX_STREAM,
+        arcp.PREFIX_TRACE,
+        arcp.PREFIX_SPAN,
+    ):
         got = arcp.new_id(prefix)
         assert got.startswith(prefix + "_")
-        body = got[len(prefix) + 1:]
+        body = got[len(prefix) + 1 :]
         assert len(body) == 26
         # Crockford alphabet only.
         assert all(c in arcp._CROCKFORD_ALPHABET for c in body)
@@ -221,6 +235,7 @@ def test_new_id_rejects_empty_prefix():
 
 def test_format_timestamp_microsecond_precision():
     import datetime
+
     dt = datetime.datetime(2026, 5, 8, 18, 21, 0, 123456)
     got = arcp.format_timestamp(dt)
     assert got == "2026-05-08T18:21:00.123456Z"

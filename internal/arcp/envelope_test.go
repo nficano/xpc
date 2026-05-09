@@ -7,7 +7,7 @@ import (
 
 func newSampleEnvelope() *Envelope {
 	e := New("msg_01HABCDEF1234567890ABCDEF", TypePing, "2026-05-08T18:21:00.000000Z")
-	e.Payload = map[string]interface{}{}
+	e.Payload = map[string]any{}
 	return e
 }
 
@@ -60,9 +60,9 @@ func TestMarshalUnmarshalRoundTrip(t *testing.T) {
 	e := newSampleEnvelope()
 	e.SessionID = "sess_abc"
 	e.JobID = "job_xyz"
-	e.Payload = map[string]interface{}{
+	e.Payload = map[string]any{
 		"key":  "value",
-		"nest": map[string]interface{}{"a": 1.0, "b": []interface{}{"x", "y"}},
+		"nest": map[string]any{"a": 1.0, "b": []any{"x", "y"}},
 	}
 
 	b, err := e.Marshal()

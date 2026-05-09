@@ -35,22 +35,22 @@ type Auth struct {
 // Required fields: ARCP, ID, Type, Timestamp, Auth, Payload.
 // Conditional fields are emitted only when non-empty (see omitempty tags).
 type Envelope struct {
-	ARCP          string                 `json:"arcp"`
-	ID            string                 `json:"id"`
-	Type          string                 `json:"type"`
-	SessionID     string                 `json:"session_id,omitempty"`
-	JobID         string                 `json:"job_id,omitempty"`
-	StreamID      string                 `json:"stream_id,omitempty"`
-	TraceID       string                 `json:"trace_id,omitempty"`
-	SpanID        string                 `json:"span_id,omitempty"`
-	ParentSpanID  string                 `json:"parent_span_id,omitempty"`
-	CorrelationID string                 `json:"correlation_id,omitempty"`
-	CausationID   string                 `json:"causation_id,omitempty"`
-	Source        string                 `json:"source,omitempty"`
-	Target        string                 `json:"target,omitempty"`
-	Timestamp     string                 `json:"timestamp"`
-	Auth          Auth                   `json:"auth"`
-	Payload       map[string]interface{} `json:"payload"`
+	ARCP          string         `json:"arcp"`
+	ID            string         `json:"id"`
+	Type          string         `json:"type"`
+	SessionID     string         `json:"session_id,omitempty"`
+	JobID         string         `json:"job_id,omitempty"`
+	StreamID      string         `json:"stream_id,omitempty"`
+	TraceID       string         `json:"trace_id,omitempty"`
+	SpanID        string         `json:"span_id,omitempty"`
+	ParentSpanID  string         `json:"parent_span_id,omitempty"`
+	CorrelationID string         `json:"correlation_id,omitempty"`
+	CausationID   string         `json:"causation_id,omitempty"`
+	Source        string         `json:"source,omitempty"`
+	Target        string         `json:"target,omitempty"`
+	Timestamp     string         `json:"timestamp"`
+	Auth          Auth           `json:"auth"`
+	Payload       map[string]any `json:"payload"`
 }
 
 // New builds an envelope with required fields populated. The caller fills in
@@ -68,7 +68,7 @@ func New(id, msgType, timestamp string) *Envelope {
 			Alg: AuthAlg,
 			Kid: AuthKID,
 		},
-		Payload: map[string]interface{}{},
+		Payload: map[string]any{},
 	}
 }
 
@@ -119,7 +119,7 @@ func Unmarshal(b []byte) (*Envelope, error) {
 		return nil, fmt.Errorf("arcp: unmarshal: %w", err)
 	}
 	if e.Payload == nil {
-		e.Payload = map[string]interface{}{}
+		e.Payload = map[string]any{}
 	}
 	if err := e.Validate(); err != nil {
 		return nil, err

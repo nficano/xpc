@@ -3,12 +3,12 @@ package cli
 import (
 	"context"
 	"encoding/csv"
-	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/nficano/xpc/internal/output"
 )
 
 // Process is the minimal per-row shape returned by `tasklist /v /fo csv`.
@@ -56,18 +56,16 @@ func newPsCmd(g *Globals) *cobra.Command {
 				procs = kept
 			}
 
-			if g.OutputMode == "json" {
-				enc := json.NewEncoder(cmd.OutOrStdout())
-				enc.SetIndent("", "  ")
-				return enc.Encode(procs)
+			mode := output.ParseMode(g.OutputMode)
+			if mode == output.ModeJSON {
+				return output.Encode(cmd.OutOrStdout(), mode, procs)
 			}
-
-			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "%-7s %-30s %10s %s\n", "PID", "NAME", "MEMORY", "USER")
+			headers := []string{"PID", "NAME", "MEMORY_KB", "USER"}
+			rows := make([][]any, 0, len(procs))
 			for _, p := range procs {
-				fmt.Fprintf(out, "%-7d %-30s %8dK %s\n", p.PID, p.Name, p.MemoryKB, p.Username)
+				rows = append(rows, []any{p.PID, p.Name, p.MemoryKB, p.Username})
 			}
-			return nil
+			return output.EncodeRows(cmd.OutOrStdout(), mode, headers, rows)
 		},
 	}
 	cmd.Flags().StringVar(&filter, "filter", "", "Substring match against the process name (case-insensitive)")

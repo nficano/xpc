@@ -36,9 +36,9 @@ func dialAndOpen(p *profile.Profile, dialTimeout time.Duration) (net.Conn, strin
 
 	openEnv := arcp.New(arcp.MustNewID(arcp.PrefixMessage), arcp.TypeSessionOpen, arcp.FormatTimestamp(time.Now()))
 	openEnv.TraceID = arcp.MustNewID(arcp.PrefixTrace)
-	openEnv.Payload = map[string]interface{}{
-		"client":       map[string]interface{}{"name": "xpc", "version": "0.0.0-dev"},
-		"capabilities": map[string]interface{}{"streaming": true, "binary_streams": true},
+	openEnv.Payload = map[string]any{
+		"client":       map[string]any{"name": "xpc", "version": "0.0.0-dev"},
+		"capabilities": map[string]any{"streaming": true, "binary_streams": true},
 	}
 	if err := arcp.Sign(openEnv, p.PSK); err != nil {
 		_ = conn.Close()
@@ -101,11 +101,11 @@ func invokeExec(
 	invoke := arcp.New(arcp.MustNewID(arcp.PrefixMessage), arcp.TypeToolInvoke, arcp.FormatTimestamp(time.Now()))
 	invoke.SessionID = sessionID
 	invoke.TraceID = traceID
-	args := map[string]interface{}{"cmd": cmd, "shell": shell}
+	args := map[string]any{"cmd": cmd, "shell": shell}
 	if timeoutSec > 0 {
 		args["timeout"] = timeoutSec
 	}
-	invoke.Payload = map[string]interface{}{"tool": "exec", "arguments": args}
+	invoke.Payload = map[string]any{"tool": "exec", "arguments": args}
 	if err := arcp.Sign(invoke, psk); err != nil {
 		return 0, err
 	}
@@ -175,7 +175,7 @@ func invokeExec(
 func closeSession(conn net.Conn, psk []byte, sessionID string) {
 	closeEnv := arcp.New(arcp.MustNewID(arcp.PrefixMessage), arcp.TypeSessionClose, arcp.FormatTimestamp(time.Now()))
 	closeEnv.SessionID = sessionID
-	closeEnv.Payload = map[string]interface{}{"reason": "client_done"}
+	closeEnv.Payload = map[string]any{"reason": "client_done"}
 	if err := arcp.Sign(closeEnv, psk); err == nil {
 		_ = arcp.WriteFrame(conn, closeEnv)
 	}

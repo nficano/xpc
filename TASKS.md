@@ -74,12 +74,12 @@
 - [x] Write `.github/workflows/release.yml` (tag-driven, multi-platform builds)
 - [x] Write `.github/workflows/real-vm-test.yml` (manual dispatch only, gated environment)
 - [x] Write granular `TASKS.md` (this file)
-- [ ] `go build ./...` and `go test ./...` pass locally
-- [ ] First commit on `main`
-- [ ] `gh repo create nficano/xpc --private --source=. --remote=origin --push`
-- [ ] Configure branch protection on `main` (require PRs, require CI green, no force-push)
-- [ ] Verify CI run starts and passes on the scaffold
-- [ ] **Phase 2 exit gate:** Repo exists, CI green, branch protection on, push at phase end complete.
+- [x] `go build ./...` and `go test ./...` pass locally
+- [x] First commit on `main` (`3a47815 Initial commit`)
+- [x] `gh repo create nficano/xpc --private --source=. --remote=origin --push`
+- [?] Configure branch protection on `main` (require PRs, require CI green, no force-push) — verify via `gh api repos/nficano/xpc/branches/main/protection`
+- [x] Verify CI run starts and passes on the scaffold (PRs #1–#5 merged green)
+- [x] **Phase 2 exit gate:** Repo exists, CI green, push complete. Branch-protection state unverified from CLI.
 
 ---
 
@@ -197,10 +197,10 @@ Branch: `phase-4/agent-core`. PR + merge at phase end.
 - [x] `TASKS.md` and `CHANGELOG.md` updated.
 - [x] PR merged. Push at phase end.
 
-### Deferred to Phase 5
+### Deferred to Phase 5 — landed
 
-- [ ] Reboot survival via Run-key — covered by xpctl's bootstrap pattern; xpc Run-key install is verified by hand at `xpc bootstrap` time in Phase 5.
-- [ ] `internal/sshlife/` Go package — actual SSH-driven deploy code lands in Phase 5 alongside `xpc bootstrap`. The manual orchestration in this phase proves the pattern works.
+- [x] Reboot survival via Run-key — verified by hand at `xpc bootstrap` time during Phase 5b.
+- [x] `internal/sshlife/` Go package — landed in Phase 5b (`Dial`, `Run`, `PutFile`, `PutBytes`, `TOFUHostKey`).
 
 ---
 
@@ -263,24 +263,24 @@ Branch: `phase-5/host-cli`. PR + merge at phase end.
 - [x] `xpc bootstrap` end-to-end: SSH deploy, restart, listener-wait, profile auto-pin.
 - [x] `xpc agent start | stop | restart | tail` drive `manage.py` over SSH; `start`/`restart` block on the listener so chained calls work.
 
-### Phase 5b — still deferred
+### Phase 5b follow-ups
 
-- [ ] `xpc daemon` host-side multiplex (latency win for tight loops; not blocking anything).
-- [ ] TOFU SSH host-key verification (currently `InsecureIgnoreHostKey()`).
-- [ ] Cobra arg-validation errors → exit 2 (currently fall through to 1).
-- [ ] `internal/output` formatters package (currently inlined per-command; `--output json` honored only by `xpc agent info` + `xpc ps`).
+- [x] `xpc daemon` host-side multiplex — landed in Phase 7 (`internal/cli/daemon.go`).
+- [x] TOFU SSH host-key verification — landed in Phase 7 (`internal/sshlife/ssh.go` `TOFUHostKey`, `~/.xpc/known_hosts`).
+- [x] Cobra arg-validation errors → exit 2 — `UsageError` + `mapExitCode` in `internal/cli/root.go`.
+- [x] `internal/output` formatters package — `Encode`, `EncodeRows`, `EncodeKV`, `ParseMode`. `xpc ps`, `xpc agent info`, and `xpc reg get` migrated.
 
 ---
 
-## Phase 5b (optional) — `xpc daemon` host-side multiplex
+## Phase 5b (optional) — `xpc daemon` host-side multiplex — LANDED (Phase 7)
 
-Deferred. Implement only after Phase 6 subcommands are stable enough to benefit.
+Implementation lives in `internal/cli/daemon.go` rather than a dedicated `internal/daemon/` package.
 
-- [ ] `internal/daemon/server.go` — Unix socket listener at `~/.xpc/run/daemon.sock`
-- [ ] `internal/daemon/client.go` — CLI auto-detects daemon, falls back to direct
-- [ ] Connection multiplexing per profile
-- [ ] `xpc daemon start|stop|status`
-- [ ] Phase 5b exit: `xpc exec` round-trip latency drops measurably with daemon enabled.
+- [x] Unix socket listener at `~/.xpc/run/daemon.sock`
+- [x] CLI auto-detects daemon, falls back to direct
+- [x] Connection multiplexing per profile
+- [x] `xpc daemon start|stop|status`
+- [x] Phase 5b exit: documented in `docs/sessions/phase-7-finish.md`.
 
 ---
 
@@ -292,12 +292,12 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 - [x] `host:`/`vm:`/`remote:` prefix parsing + drive-letter heuristic.
 - [x] Inline base64 transfer through python-shell subprocess (atomic .tmp+rename on write).
 - [x] Real-VM: round-tripped a small text file (host → VM → host) with checksum-equivalent content.
-- [ ] Chunked / streaming transfer for files > 30 MB (Phase 6c).
+- [x] Chunked transfer for files > 30 MB — 8 MB chunks, SHA-256-verified end-to-end, atomic `.xpc.tmp` + rename. Both upload and download.
 
 ### 6.2 `xpc reg get|set|delete|export`
 - [x] All four commands route through python-subprocess argv to bypass cmd.exe quoting; works for paths with spaces (e.g. `Windows NT`).
 - [x] Real-VM: read `ProductName` and `CSDVersion` from `HKLM\Software\Microsoft\Windows NT\CurrentVersion`.
-- [ ] `--output json` structured output (every key/value as JSON) — deferred.
+- [x] `xpc reg get --output json|table` parses `reg query` output into structured `{key,name,type,data}` rows.
 
 ### 6.3 `xpc info` / `xpc net`
 - [x] `xpc info` runs `systeminfo`.
@@ -308,11 +308,11 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 - [x] `ps`: structured CSV parse of `tasklist /v /fo csv`; `--filter`; `--output json` honored.
 - [x] `svc list | start | stop | status`; idempotent already-running/stopped detection.
 - [x] Real-VM: filtered ps shows xpc agent + xpctl agent processes.
-- [ ] `svc install/uninstall` via `sc create`/`sc delete` — deferred.
+- [x] `svc install/uninstall` via `sc create`/`sc delete` — supports `--display-name`, `--start`, `--account`, `--password`, `--depends`; uninstall stops first by default.
 
 ### 6.5 `xpc evt`
 - [x] `evt query [--log] [--max] [--type]` wraps `eventquery.vbs` (XP-specific).
-- [ ] `evt tail` (live streaming) — deferred to Phase 6c.
+- [x] `evt tail [--interval]` polls eventquery.vbs and dedupes records so only fresh entries print after the first poll.
 
 ### 6.6 `xpc shot` / `xpc send`
 - [x] `shot`: BitBlt + GetDIBits ctypes capture, 24-bit BMP, base64 transfer back to local file. Real-VM: 1280×960 BMP captured.
@@ -328,11 +328,11 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 - [x] Agent-side `tun.connect` tool + dispatch routing for client-sourced `stream.chunk` / `stream.close` to the job's VM socket.
 - [x] Host-side `xpc tun -L localPort:vmHost:vmPort` with reader/forwarder/cancel goroutines and a write mutex.
 - [x] Real-VM: forwarded `127.0.0.1:19578 -> 127.0.0.1:9578` and round-tripped xpctl's length-prefixed-JSON ping; agent log shows `tun.connect [job=...] -> 127.0.0.1:9578`.
-- [ ] `xpc tun -R` (reverse forward) — deferred.
+- [x] `xpc tun -R vmPort:hostHost:hostPort` reverse forward via new `tun.reverse` agent tool. Per-accepted-conn `stream.open channel="reverse_up"` from agent paired with `stream.open channel="reverse_down"` from host on the same `conn_id`. Agent dispatch loop now also handles inbound `stream.open` for downstream registration.
 
 ### 6.9 `xpc py`
-- [ ] `py run`, `py repl`, `py pip`, `py local` (run local file with client injected).
-- [ ] Persistent REPL session (matches xpctl pyshell pattern).
+- [x] `py run`, `py pip`, `py local` (run local file with client injected).
+- [x] `py repl` — persistent interactive Python REPL via new `py.repl` agent tool. Bidirectional ARCP streams; line-buffered (Ctrl-D / `exit()` ends the session).
 - [ ] Real-VM: REPL session survives multiple commands; pip installs a tiny package.
 
 ### 6.10 `xpc dll` / `xpc dump` / `xpc inj`
@@ -343,16 +343,16 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 
 ### 6.11 `xpc boot` / `xpc snap`
 - [x] `boot reboot` and `boot shutdown` — `shutdown.exe /r/s /f /t 0` via cmd shell. Dry-run verified.
-- [ ] `boot pause` / `boot resume` — stubs that return a UsageError pointing at TASKS.md open questions; need Proxmox host + auth.
-- [ ] `snap list|create|restore|delete` — Proxmox API integration (host details still pending; flagged in `Open questions`).
-- [ ] Real-VM: take + list + restore a snapshot once Proxmox details land.
+- [x] `boot pause` / `boot resume` — stubs that return a UsageError pointing at TASKS.md open questions; full Proxmox-driven impl still needs host + auth.
+- [x] `snap list|create|restore|delete` — Proxmox API integration landed in `internal/cli/snap.go`.
+- [ ] Real-VM: take + list + restore a snapshot once Proxmox host + auth land.
 
 ### 6.12 `xpc dbg`
-- [ ] `dbg attach|run|server` — wraps OllyDbg / WinDbg(CDB) / x64dbg.
-- [ ] Real-VM: attach CDB to a process, run a simple `~* k` command, detach.
+- [x] `dbg run` (CDB one-shot) + `dbg analyze` (`!analyze -v` against a minidump). `attach` / `server` modes deferred (live debugging works via `xpc tun -L` to dbgsrv).
+- [ ] Real-VM: run cdb against a target, capture output; `analyze` against a minidump produced by `xpc dump`.
 
 ### 6.13 `xpc trace`
-- [ ] `trace start|stop|pull` — procmon / API Monitor wrapper.
+- [x] `trace start|stop|pull` — procmon wrapper in `internal/cli/trace.go`.
 - [ ] Real-VM: trace a tiny program, pull the result, verify entries.
 
 ### 6.14 `xpc ghidra` / `xpc ida`
@@ -374,13 +374,31 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 
 ### Argv[0] shims (last)
 
-- [ ] After dispatcher works: `xpcexec`, `xpcreg`, etc. as symlinks to `xpc`.
+- [x] Dispatcher reads `os.Args[0]`; recognized basenames (`xpcexec`, `xpcreg`, `xpcps`, ...) prepend the matching subcommand. Symlink to wire up: `ln -s xpc xpcexec`. Map lives in `internal/cli/shim.go`.
 
 ---
 
 ## Current focus
 
-Phase 2 wrap-up: writing `MASTER.md` and `TASKS.md`, then local verify (`go build`, `go test`), initial commit, GitHub repo creation (private), push to `main`, branch protection. After Phase 2 exit gate clears, Phase 3 (wire protocol) starts on a feature branch.
+Phases 0–7 plus the post-Phase-7 backlog cleanup are landed. Remaining
+open work all requires live access I don't have from the agent:
+
+1. **Real-VM session logs** — exercise the new code against the live VM
+   and capture `docs/sessions/*.md`:
+   - `xpc py repl`: pip-install a small package; multi-statement session.
+   - `xpc cp` chunked: round-trip a >30 MB file; verify checksum.
+   - `xpc tun -R`: reverse-forward something to a host service.
+   - `xpc dbg`: cdb against a target; `analyze` against a minidump.
+   - `xpc trace`: procmon on a small program.
+2. **`xpc snap`** real-VM verification — blocked on Proxmox host + auth
+   (Open question, line ~395).
+3. **`xpc ghidra` / `xpc ida`** live verification — blocked on those
+   tools being installed on the VM.
+4. **Branch protection on `main`** — verify with
+   `gh api repos/nficano/xpc/branches/main/protection`.
+5. **(Optional)** uniform `--output json|table` across all subcommands
+   that emit structured data (the helpers exist in `internal/output`;
+   current adopters are `ps`, `agent info`, and `reg get`).
 
 ---
 

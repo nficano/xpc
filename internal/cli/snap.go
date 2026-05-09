@@ -134,7 +134,7 @@ func addProxmoxFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().Bool("proxmox-insecure", false, "Skip TLS verification of the Proxmox API endpoint")
 }
 
-func proxmoxRequest(ctx context.Context, c *proxmoxConfig, method, path string, body url.Values) (map[string]interface{}, error) {
+func proxmoxRequest(ctx context.Context, c *proxmoxConfig, method, path string, body url.Values) (map[string]any, error) {
 	endpoint := fmt.Sprintf("https://%s:8006%s", c.Host, path)
 	var reader io.Reader
 	if body != nil {
@@ -167,7 +167,7 @@ func proxmoxRequest(ctx context.Context, c *proxmoxConfig, method, path string, 
 	if resp.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("proxmox %s %s: HTTP %d: %s", method, path, resp.StatusCode, strings.TrimSpace(string(raw)))
 	}
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &parsed); err != nil {
 			return nil, fmt.Errorf("proxmox json decode: %w", err)
@@ -196,7 +196,7 @@ func newSnapListCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			data, _ := out["data"].([]interface{})
+			data, _ := out["data"].([]any)
 			if g.OutputMode == "json" {
 				enc := json.NewEncoder(cmd.OutOrStdout())
 				enc.SetIndent("", "  ")
@@ -208,7 +208,7 @@ func newSnapListCmd(g *Globals) *cobra.Command {
 			}
 			cmd.Printf("%-25s %-25s %s\n", "NAME", "PARENT", "DESCRIPTION")
 			for _, raw := range data {
-				e, _ := raw.(map[string]interface{})
+				e, _ := raw.(map[string]any)
 				name, _ := e["name"].(string)
 				parent, _ := e["parent"].(string)
 				desc, _ := e["description"].(string)

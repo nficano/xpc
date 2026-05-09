@@ -8,5 +8,5 @@ import (
 )
 
 func main() {
-	os.Exit(cli.Execute(os.Args[1:], os.Stdout, os.Stderr))
+	os.Exit(cli.Execute(cli.ShimArgs(os.Args), os.Stdout, os.Stderr))
 }

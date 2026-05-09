@@ -103,9 +103,9 @@ func runExec(conn net.Conn, psk []byte, cmd, shell string, timeout time.Duration
 		arcp.FormatTimestamp(time.Now()),
 	)
 	openEnv.TraceID = arcp.MustNewID(arcp.PrefixTrace)
-	openEnv.Payload = map[string]interface{}{
-		"client":       map[string]interface{}{"name": "xpc-exec", "version": "0"},
-		"capabilities": map[string]interface{}{"streaming": true, "binary_streams": true},
+	openEnv.Payload = map[string]any{
+		"client":       map[string]any{"name": "xpc-exec", "version": "0"},
+		"capabilities": map[string]any{"streaming": true, "binary_streams": true},
 	}
 	if err := arcp.Sign(openEnv, psk); err != nil {
 		return 0, fmt.Errorf("sign session.open: %w", err)
@@ -134,11 +134,11 @@ func runExec(conn net.Conn, psk []byte, cmd, shell string, timeout time.Duration
 	)
 	invoke.SessionID = sessionID
 	invoke.TraceID = openEnv.TraceID
-	args := map[string]interface{}{"cmd": cmd, "shell": shell}
+	args := map[string]any{"cmd": cmd, "shell": shell}
 	if timeout > 0 {
 		args["timeout"] = int64(timeout.Seconds())
 	}
-	invoke.Payload = map[string]interface{}{
+	invoke.Payload = map[string]any{
 		"tool":      "exec",
 		"arguments": args,
 	}
@@ -230,7 +230,7 @@ loop:
 	// Best-effort session.close.
 	closeEnv := arcp.New(arcp.MustNewID(arcp.PrefixMessage), arcp.TypeSessionClose, arcp.FormatTimestamp(time.Now()))
 	closeEnv.SessionID = sessionID
-	closeEnv.Payload = map[string]interface{}{"reason": "client_done"}
+	closeEnv.Payload = map[string]any{"reason": "client_done"}
 	if err := arcp.Sign(closeEnv, psk); err == nil {
 		_ = arcp.WriteFrame(conn, closeEnv)
 	}

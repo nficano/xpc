@@ -190,10 +190,10 @@ func newDaemonExecCmd(g *Globals) *cobra.Command {
 				return err
 			}
 
-			req := map[string]interface{}{
+			req := map[string]any{
 				"action":  "exec",
 				"profile": p.Name,
-				"args": map[string]interface{}{
+				"args": map[string]any{
 					"cmd":   strings.Join(args, " "),
 					"shell": shell,
 				},
@@ -210,7 +210,7 @@ func newDaemonExecCmd(g *Globals) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				var msg map[string]interface{}
+				var msg map[string]any
 				if err := json.Unmarshal([]byte(strings.TrimSpace(line)), &msg); err != nil {
 					return err
 				}
@@ -272,14 +272,14 @@ func (d *daemon) serve(ctx context.Context, conn net.Conn) {
 		if err != nil {
 			return
 		}
-		var req map[string]interface{}
+		var req map[string]any
 		if err := json.Unmarshal([]byte(strings.TrimSpace(line)), &req); err != nil {
 			writeDaemonError(conn, err)
 			continue
 		}
 		action, _ := req["action"].(string)
 		profileName, _ := req["profile"].(string)
-		argsRaw, _ := req["args"].(map[string]interface{})
+		argsRaw, _ := req["args"].(map[string]any)
 		switch action {
 		case "exec":
 			if err := d.handleExec(ctx, conn, profileName, argsRaw); err != nil {
@@ -294,11 +294,11 @@ func (d *daemon) serve(ctx context.Context, conn net.Conn) {
 }
 
 func writeDaemonError(w net.Conn, err error) {
-	payload, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
+	payload, _ := json.Marshal(map[string]any{"error": err.Error()})
 	_, _ = fmt.Fprintln(w, string(payload))
 }
 
-func (d *daemon) handleExec(ctx context.Context, conn net.Conn, profileName string, args map[string]interface{}) error {
+func (d *daemon) handleExec(ctx context.Context, conn net.Conn, profileName string, args map[string]any) error {
 	if profileName == "" {
 		profileName = profile.DefaultName
 	}
@@ -316,9 +316,9 @@ func (d *daemon) handleExec(ctx context.Context, conn net.Conn, profileName stri
 	invoke := arcp.New(arcp.MustNewID(arcp.PrefixMessage), arcp.TypeToolInvoke,
 		arcp.FormatTimestamp(time.Now()))
 	invoke.SessionID = sess.sessionID
-	invoke.Payload = map[string]interface{}{
+	invoke.Payload = map[string]any{
 		"tool": "exec",
-		"arguments": map[string]interface{}{
+		"arguments": map[string]any{
 			"cmd":   cmdStr,
 			"shell": shell,
 		},
@@ -356,7 +356,7 @@ func (d *daemon) handleExec(ctx context.Context, conn net.Conn, profileName stri
 			if ch == "stderr" {
 				key = "stderr_b64"
 			}
-			out := map[string]interface{}{
+			out := map[string]any{
 				key: base64.StdEncoding.EncodeToString([]byte(delta)),
 			}
 			payload, _ := json.Marshal(out)
@@ -368,7 +368,7 @@ func (d *daemon) handleExec(ctx context.Context, conn net.Conn, profileName stri
 			if v, ok := env.Payload["exit_code"].(float64); ok {
 				rc = int(v)
 			}
-			payload, _ := json.Marshal(map[string]interface{}{"exit_code": rc})
+			payload, _ := json.Marshal(map[string]any{"exit_code": rc})
 			_, _ = fmt.Fprintln(conn, string(payload))
 		case arcp.TypeJobCompleted, arcp.TypeJobFailed, arcp.TypeJobCancelled:
 			return nil
