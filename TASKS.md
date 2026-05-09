@@ -356,9 +356,10 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 - [ ] Real-VM: trace a tiny program, pull the result, verify entries.
 
 ### 6.14 `xpc ghidra` / `xpc ida`
-- [ ] `ghidra start|stop` — ghidra_server lifecycle + tunnel.
-- [ ] `ida start|stop` — IDA remote-debug stub lifecycle + tunnel.
-- [ ] Real-VM: start ghidra_server, connect from local Ghidra over the tunnel.
+- [x] `xpc ghidra start [--binary] [--port] [--repo]` / `xpc ghidra stop`. Detached spawn via `os.dup2`-to-NUL + `DETACHED_PROCESS`; PID saved to `C:\xpc\ghidra.runlog.pid`. Stop matches `java.exe` with `%ghidra%` in cmdline.
+- [x] `xpc ida start [--binary] [--port]` / `xpc ida stop`. Same lifecycle pattern; defaults target `C:\IDA\dbgsrv\win32_remote.exe` on port 23946. Stop matches both `win32_remote.exe` and `dbgsrv.exe`.
+- [x] Tunnel decoupled: users run `xpc tun -L <port>:127.0.0.1:<port>` separately.
+- [ ] Live verification waits until Ghidra / IDA are installed on the VM.
 
 ### Filesystem extras (preserved from xpctl, renamed)
 
