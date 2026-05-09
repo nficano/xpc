@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 6 (second wave) — RE-flavored subcommands**:
+  - `xpc fetch <url> [vm:path]`: host downloads URL, then `cp` to VM
+    (default `C:\xpc\downloads\<basename>`).
+  - `xpc edit <vm:path>` [--editor]: cp pull → $EDITOR → cp push if changed.
+  - `xpc boot reboot | shutdown` (`shutdown.exe /r|/s /f /t 0`); `pause` /
+    `resume` stub UsageError pointing at the Proxmox open question.
+  - `xpc send keys -- <text> [--title] [--delay-ms]`,
+    `xpc send click [--x --y --button --double]`,
+    `xpc send move --x --y` — SendInput-style synthetic input via ctypes.
+  - `xpc inj <pid> <vm:dll>` — OpenProcess + VirtualAllocEx +
+    WriteProcessMemory + CreateRemoteThread(LoadLibraryA).
+  - `xpc dump <pid> [-o] [--full]` — MiniDumpWriteDump via dbghelp.dll
+    (Normal or WithFullMemory), bytes streamed back base64. Real-VM:
+    22.8 KB minidump of the running xpc agent recovered as a valid
+    "Mini DuMP crash report" file.
+
 - **Phase 6 (first wave) — subcommand surface**:
   - Diagnostics: `xpc info`, `xpc net [ipconfig|netstat|route]`, `xpc ps [--filter]`.
   - Registry: `xpc reg {get,set,delete,export}` routed through python-subprocess

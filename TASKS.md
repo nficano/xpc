@@ -310,7 +310,9 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 
 ### 6.6 `xpc shot` / `xpc send`
 - [x] `shot`: BitBlt + GetDIBits ctypes capture, 24-bit BMP, base64 transfer back to local file. Real-VM: 1280×960 BMP captured.
-- [ ] `send keys|click|move` — deferred (needs SendInput ctypes).
+- [x] `send keys -- <text> [--title] [--delay-ms]` — VkKeyScanW + keybd_event sequence.
+- [x] `send click [--x --y --button --double]` — SetCursorPos + mouse_event.
+- [x] `send move --x --y` — SetCursorPos.
 
 ### 6.7 `xpc bat`
 - [x] `bat run <vm:path>` invokes a .bat already on the VM with cmd.exe.
@@ -327,13 +329,16 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 - [ ] Real-VM: REPL session survives multiple commands; pip installs a tiny package.
 
 ### 6.10 `xpc dll` / `xpc dump` / `xpc inj`
-- [ ] `dll list/inject/regsvr32`, `dump <pid>`, `inj <pid> <dll>`.
-- [ ] Real-VM: dump a benign process, inject a no-op DLL.
+- [x] `dll list <pid>` — `tasklist /m` wrapper.
+- [x] `dll regsvr32 <vm:dll> [--unregister]`.
+- [x] `dump <pid> [-o <path>] [--full]` — MiniDumpWriteDump via dbghelp; base64-transferred to host. Real-VM verified (22.8 KB normal-mode dump of xpc agent).
+- [x] `inj <pid> <vm:dll>` — OpenProcess + VirtualAllocEx + WriteProcessMemory + CreateRemoteThread(LoadLibraryA). Dry-run printed; live injection deferred until a benign target DLL exists on the VM.
 
 ### 6.11 `xpc boot` / `xpc snap`
-- [ ] `boot reboot|shutdown|pause|resume`.
-- [ ] `snap list|create|restore|delete` — Proxmox API integration (host details still pending; flag in `Open questions`).
-- [ ] Real-VM: take + list + restore a snapshot.
+- [x] `boot reboot` and `boot shutdown` — `shutdown.exe /r/s /f /t 0` via cmd shell. Dry-run verified.
+- [ ] `boot pause` / `boot resume` — stubs that return a UsageError pointing at TASKS.md open questions; need Proxmox host + auth.
+- [ ] `snap list|create|restore|delete` — Proxmox API integration (host details still pending; flagged in `Open questions`).
+- [ ] Real-VM: take + list + restore a snapshot once Proxmox details land.
 
 ### 6.12 `xpc dbg`
 - [ ] `dbg attach|run|server` — wraps OllyDbg / WinDbg(CDB) / x64dbg.
@@ -350,14 +355,14 @@ Each subcommand: branch `subcommand/<name>`, write spec + tests + impl + real-VM
 
 ### Filesystem extras (preserved from xpctl, renamed)
 
-- [ ] `xpc cat <vm:path>` — print remote file
-- [ ] `xpc head <vm:path>` — first N lines
-- [ ] `xpc tail <vm:path>` — last N lines (option `-f` for follow)
-- [ ] `xpc find <vm:path>` — recursive glob/regex
-- [ ] `xpc sum <vm:path>` — md5/sha1/sha256
-- [ ] `xpc fetch <url> [vm:path]` — download URL → upload to VM
-- [ ] `xpc edit <vm:path>` — pull → $EDITOR → push if changed
-- [ ] `xpc watch <cmd>` — repeat at interval
+- [x] `xpc cat <vm:path>` — python-shell-driven (backslash-safe).
+- [x] `xpc head -n N <vm:path>`.
+- [x] `xpc tail -n N <vm:path>` (`-f` follow deferred).
+- [x] `xpc find <vm:path> [--glob] [--regex]`.
+- [x] `xpc sum <vm:path> [--algo md5|sha1|sha256]`.
+- [x] `xpc fetch <url> [vm:path]` — download URL on host, then `cp` to VM (default `C:\xpc\downloads\<basename>`).
+- [x] `xpc edit <vm:path>` — pull → $EDITOR → push if changed; `--editor` overrides $EDITOR.
+- [x] `xpc watch -- <cmd>` — repeat at `--interval` (default 2s).
 
 ### Argv[0] shims (last)
 

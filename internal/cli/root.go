@@ -72,6 +72,12 @@ func New() *cobra.Command {
 	root.AddCommand(newDllCmd(g))
 	root.AddCommand(newCpCmd(g))
 	root.AddCommand(newShotCmd(g))
+	root.AddCommand(newFetchCmd(g))
+	root.AddCommand(newEditCmd(g))
+	root.AddCommand(newBootCmd(g))
+	root.AddCommand(newSendCmd(g))
+	root.AddCommand(newInjCmd(g))
+	root.AddCommand(newDumpCmd(g))
 	// Filesystem helpers (xpctl extras renamed to top-level).
 	root.AddCommand(newCatCmd(g))
 	root.AddCommand(newHeadCmd(g))
