@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 6d — RE-server lifecycle (`xpc ghidra`, `xpc ida`)**:
+  - `xpc ghidra start [--binary] [--port] [--repo]` /
+    `xpc ghidra stop`: detached-spawn `ghidraSvr.bat` (default
+    `C:\ghidra\support\ghidraSvr.bat`) on the VM via the
+    `os.dup2`-to-NUL + `DETACHED_PROCESS` trick; PID saved to
+    `C:\xpc\ghidra.runlog.pid`. Stop kills `java.exe` whose command line
+    matches `%ghidra%` via WMIC + taskkill.
+  - `xpc ida start [--binary] [--port]` / `xpc ida stop`: same lifecycle
+    pattern targeting `win32_remote.exe` on port 23946 by default; stop
+    also matches `dbgsrv.exe`.
+  - Tunnel deliberately decoupled — users run
+    `xpc tun -L <port>:127.0.0.1:<port>` to expose the server.
+  - Shared helpers `buildDetachedSpawnPy` and `killByCmdLineMatch` in
+    `internal/cli/ghidra.go` are reused by `xpc ida` and ready for future
+    server-lifecycle commands.
+
 - **Phase 6c — `xpc tun` (bidirectional ARCP streams)**:
   - Agent: new `tun.connect` tool opens a VM-side TCP socket and pumps
     bytes to the host via `stream.chunk(delta_b64)` envelopes.
