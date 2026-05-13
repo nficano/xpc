@@ -169,14 +169,21 @@ func (g *Globals) ResolveProfile() (*profile.Profile, error) {
 func newARCPObserver(w io.Writer) arcp.Observer {
 	var mu sync.Mutex
 	return func(dir arcp.Direction, e *arcp.Envelope) {
+		sdkEnvelope, sdkErr := marshalSDKEnvelope(e)
 		record := struct {
-			Ts       string         `json:"ts"`
-			Dir      string         `json:"dir"`
-			Envelope *arcp.Envelope `json:"envelope"`
+			Ts          string          `json:"ts"`
+			Dir         string          `json:"dir"`
+			Envelope    *arcp.Envelope  `json:"envelope"`
+			SDKEnvelope json.RawMessage `json:"sdk_envelope,omitempty"`
+			SDKError    string          `json:"sdk_error,omitempty"`
 		}{
-			Ts:       time.Now().UTC().Format(time.RFC3339Nano),
-			Dir:      string(dir),
-			Envelope: e,
+			Ts:          time.Now().UTC().Format(time.RFC3339Nano),
+			Dir:         string(dir),
+			Envelope:    e,
+			SDKEnvelope: sdkEnvelope,
+		}
+		if sdkErr != nil {
+			record.SDKError = sdkErr.Error()
 		}
 		buf, err := json.Marshal(record)
 		if err != nil {
@@ -187,6 +194,18 @@ func newARCPObserver(w io.Writer) arcp.Observer {
 		_, _ = w.Write(buf)
 		_, _ = w.Write([]byte("\n"))
 	}
+}
+
+func marshalSDKEnvelope(e *arcp.Envelope) (json.RawMessage, error) {
+	sdkEnvelope, err := arcp.ToSDKEnvelope(e)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(sdkEnvelope)
+	if err != nil {
+		return nil, err
+	}
+	return raw, nil
 }
 
 // ---- exit codes -----------------------------------------------------------
