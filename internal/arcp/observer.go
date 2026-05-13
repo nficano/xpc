@@ -5,6 +5,7 @@ import "sync/atomic"
 // Direction indicates whether an envelope is being sent or received.
 type Direction string
 
+// Direction values passed to an Observer for outbound vs inbound envelopes.
 const (
 	DirSend Direction = "send"
 	DirRecv Direction = "recv"

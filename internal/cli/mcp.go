@@ -410,9 +410,8 @@ func (b *mcpBridge) handleCancelled(req jsonrpcReq) {
 	if err := json.Unmarshal(req.Params, &p); err != nil {
 		return
 	}
-	key := string(p.RequestID)
 	b.callsMu.Lock()
-	call := b.mcpReqs[key]
+	call := b.mcpReqs[string(p.RequestID)]
 	b.callsMu.Unlock()
 	if call == nil {
 		return

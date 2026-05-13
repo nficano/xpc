@@ -298,10 +298,9 @@ func cpDownloadInline(ctx context.Context, cmd *cobra.Command, g *Globals, vmPat
 	if int64(len(raw)) != total {
 		return fmt.Errorf("size mismatch: got %d bytes, expected %d", len(raw), total)
 	}
-	gotSha := hex.EncodeToString(sha256.New().Sum(nil)) // placeholder; recompute below
 	h := sha256.New()
 	_, _ = h.Write(raw)
-	gotSha = hex.EncodeToString(h.Sum(nil))
+	gotSha := hex.EncodeToString(h.Sum(nil))
 	if gotSha != wantSha {
 		return fmt.Errorf("sha256 mismatch: vm=%s host=%s", wantSha, gotSha)
 	}
