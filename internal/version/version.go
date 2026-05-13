@@ -8,7 +8,15 @@ package version
 // development builds; release builds override it via -ldflags.
 var Version = "0.0.0-dev"
 
-// String returns the version string.
+// Codename is the human-friendly release name (e.g. "loony-lionfish") set by
+// the release workflow via -ldflags. Empty for dev builds.
+var Codename = ""
+
+// String returns the version string, with the codename appended in parens
+// when set by a release build.
 func String() string {
+	if Codename != "" {
+		return Version + " (" + Codename + ")"
+	}
 	return Version
 }
