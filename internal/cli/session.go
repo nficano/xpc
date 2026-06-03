@@ -13,17 +13,28 @@ import (
 	"github.com/nficano/xpc/internal/transport"
 )
 
+// requireDialable validates that p carries the minimum config to open a
+// session (host, pinned fingerprint, PSK). It returns a usage/auth error with
+// remediation guidance — these are permanent misconfigurations, distinct from
+// a transient failure to reach a correctly-configured VM.
+func requireDialable(p *profile.Profile) error {
+	if p.Host == "" {
+		return wrapUsage(fmt.Errorf("profile %q has no host; run `xpc configure --profile %s` or `xpc bootstrap`", p.Name, p.Name))
+	}
+	if p.Fingerprint == "" {
+		return wrapUsage(fmt.Errorf("profile %q has no pinned fingerprint; run `xpc bootstrap --profile %s`", p.Name, p.Name))
+	}
+	if len(p.PSK) == 0 {
+		return wrapAuth(fmt.Errorf("profile %q has no PSK in ~/.xpc/credentials; run `xpc bootstrap --profile %s`", p.Name, p.Name))
+	}
+	return nil
+}
+
 // dialAndOpen connects to the agent named by p, performs TLS+session.open, and
 // returns the live conn plus the resolved session_id.
 func dialAndOpen(p *profile.Profile, dialTimeout time.Duration) (net.Conn, string, error) {
-	if p.Host == "" {
-		return nil, "", wrapUsage(fmt.Errorf("profile %q has no host; run `xpc configure --profile %s` or `xpc bootstrap`", p.Name, p.Name))
-	}
-	if p.Fingerprint == "" {
-		return nil, "", wrapUsage(fmt.Errorf("profile %q has no pinned fingerprint; run `xpc bootstrap --profile %s`", p.Name, p.Name))
-	}
-	if len(p.PSK) == 0 {
-		return nil, "", wrapAuth(fmt.Errorf("profile %q has no PSK in ~/.xpc/credentials; run `xpc bootstrap --profile %s`", p.Name, p.Name))
+	if err := requireDialable(p); err != nil {
+		return nil, "", err
 	}
 	if dialTimeout <= 0 {
 		dialTimeout = 10 * time.Second

@@ -24,6 +24,7 @@ successor to [xpctl](https://github.com/nficano/xpctl).
 - [docs/INVESTIGATION.md](docs/INVESTIGATION.md) — Phase 0 findings
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Phase 1 architecture decisions
 - [docs/protocol/RFC-0001.md](docs/protocol/RFC-0001.md) — ARCP RFC frozen at sign-off
+- [docs/protocol/RFC-0002-otel.md](docs/protocol/RFC-0002-otel.md) — OpenTelemetry export design (draft)
 
 ## Layout
 

@@ -1,0 +1,46 @@
+# OpenTelemetry Collector config for watching `xpc otel export` output locally.
+#
+# Receives OTLP from xpc and prints every metric and log record to the
+# collector's stdout via the `debug` exporter. This is the local-verification
+# setup from RFC 0002 §17 ("verify against a local otelcol using the debug
+# exporter"). Swap the debug exporter for a real backend (Prometheus, Loki,
+# Tempo, vendor OTLP, ...) when you go to production — that choice lives here,
+# in the Collector, not in xpc.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Per RFC 0002 §16, complementary sources plug in here alongside otlp — they
+  # augment the xpc-driven scrape, they do not replace it. Uncomment as needed
+  # (these require the -contrib image, which this compose uses):
+  #
+  # statsd:
+  #   endpoint: 0.0.0.0:8125
+  # filelog:
+  #   include: [/var/log/xpc/*.log]
+
+processors:
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+  telemetry:
+    logs:
+      level: info

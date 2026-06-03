@@ -1,0 +1,21 @@
+# Local OpenTelemetry Collector for verifying `xpc otel export`.
+#
+#   docker compose -f deploy/otel/docker-compose.yml up
+#   xpc otel export --endpoint localhost:4317 --insecure --interval 15s
+#
+# The collector prints received metrics and logs to its stdout (debug
+# exporter), so `docker compose ... logs -f otelcol` shows what xpc is sending.
+#
+# Image pinned to a verified stable contrib release; bump as new ones ship.
+
+services:
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.153.0
+    container_name: xpc-otelcol
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC (xpc --endpoint)
+      - "4318:4318" # OTLP HTTP
+    restart: unless-stopped

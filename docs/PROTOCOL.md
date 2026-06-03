@@ -389,7 +389,7 @@ The following are defined in ARCP RFC 0001 and explicitly out of scope for v0. A
 - `resume` and `job.checkpoint` / `checkpoint.restore` — durable jobs across reconnects.
 - `backpressure` envelope — flow control on streams.
 - `agent.delegate` / `agent.handoff` — multi-agent coordination.
-- `metric` / `trace.span` events — OpenTelemetry export.
+- `metric` / `trace.span` events — OpenTelemetry export; see [RFC 0002](protocol/RFC-0002-otel.md).
 - `workflow.start` / `workflow.complete` — multi-step workflows.
 
 The envelope shape already accommodates these; only the dispatch handlers are missing.

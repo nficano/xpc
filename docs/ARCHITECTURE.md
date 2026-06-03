@@ -110,7 +110,7 @@ In v0 there is no `xpc daemon` process; every `xpc <cmd>` opens a new TCP connec
 - Control: `session.open`, `session.accepted`, `session.close`, `ping`, `pong`, `ack`, `nack`, `cancel`, `permission.request`, `permission.grant`, `permission.deny`. **Deferred:** `resume`, `checkpoint.create`/`restore`, `backpressure`. Adding these is non-breaking later.
 - Execution: `tool.invoke`, `tool.result`, `tool.error`, `job.accepted`, `job.started`, `job.progress`, `job.completed`, `job.failed`, `job.cancelled`. **Deferred:** `job.heartbeat`, `job.checkpoint`, `workflow.start`, `agent.delegate`, `agent.handoff`.
 - Streaming: `stream.open`, `stream.chunk`, `stream.close`, `stream.error`. All in v0.
-- Event: `log` only. **Deferred:** `metric`, `trace.span` (use OTel later).
+- Event: `log` only. **Deferred:** `metric`, `trace.span` — OTel export designed in [RFC 0002](protocol/RFC-0002-otel.md).
 
 **Capability negotiation** at `session.open`:
 ```json
@@ -404,7 +404,7 @@ Not blockers for Phase 1 sign-off.
 - PSK rotation UX (`xpc rotate-key`) — Phase 6+.
 - WebSocket transport — possible v2 if MCP integration becomes interesting.
 - Service install (`xpc serve install --as-service`) — Phase 6+.
-- OpenTelemetry export of `trace.span` events — v2.
+- OpenTelemetry export — designed in [RFC 0002](protocol/RFC-0002-otel.md) (host-side OTLP producer).
 - `xpc daemon` host-side multiplex — Phase 5b.
 - Argv[0]-based shims (`xpcexec`, `xpcreg`) — after dispatcher is solid.
 - Binary-channel framing alternative to base64-in-JSON for big binary streams — evaluated in Phase 3.

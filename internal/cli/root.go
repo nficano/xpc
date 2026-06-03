@@ -105,6 +105,7 @@ func New() *cobra.Command {
 	root.AddCommand(newDbgCmd(g))
 	root.AddCommand(newSnapCmd(g))
 	root.AddCommand(newDaemonCmd(g))
+	root.AddCommand(newOtelCmd(g))
 	root.AddCommand(newMCPCmd(g))
 	// Filesystem helpers (xpctl extras renamed to top-level).
 	root.AddCommand(newCatCmd(g))
