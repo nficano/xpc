@@ -336,6 +336,10 @@ func (l *otelLoop) scrapeEventLog(ctx context.Context, logName string) ([]otel.L
 // parseTypeperf reads `typeperf ... -sc 1` PDH-CSV output. The header row's
 // first field contains "PDH-CSV"; the data row is "timestamp",cpu,mem.
 func parseTypeperf(text string) (cpuPct *float64, memBytes *int64) {
+	// Windows Python text-mode stdout turns typeperf's \r\n into \r\r\n; the
+	// doubled CR breaks encoding/csv, which then parses no data row. Strip all
+	// CRs so records are plain \n-terminated.
+	text = strings.ReplaceAll(text, "\r", "")
 	r := csv.NewReader(strings.NewReader(text))
 	r.FieldsPerRecord = -1
 	for {
