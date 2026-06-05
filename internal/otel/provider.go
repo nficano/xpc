@@ -270,21 +270,23 @@ func (p *Provider) Shutdown(ctx context.Context) error {
 
 // severityFor maps a Windows Event Log type token to an OTLP severity.
 func severityFor(t string) (otellog.Severity, string) {
-	switch strings.TrimSpace(t) {
-	case "Error":
+	// Case-insensitive: eventquery.vbs emits lower-case types ("information") on
+	// some XP builds. Preserve the canonical descriptive label in severity_text.
+	switch strings.ToLower(strings.TrimSpace(t)) {
+	case "error":
 		return otellog.SeverityError, "Error"
-	case "Failure Audit":
+	case "failure audit":
 		return otellog.SeverityError, "Failure Audit"
-	case "Warning":
+	case "warning":
 		return otellog.SeverityWarn, "Warning"
-	case "Information":
+	case "information":
 		return otellog.SeverityInfo, "Information"
-	case "Success Audit":
+	case "success audit":
 		return otellog.SeverityInfo, "Success Audit"
 	case "":
 		return otellog.SeverityUndefined, ""
 	default:
-		return otellog.SeverityInfo, t
+		return otellog.SeverityInfo, strings.TrimSpace(t)
 	}
 }
 

@@ -456,8 +456,11 @@ func parseEventTime(s string) (time.Time, bool) {
 }
 
 func isEventType(s string) bool {
-	switch s {
-	case "Information", "Warning", "Error", "Success Audit", "Failure Audit":
+	// eventquery.vbs renders the Type column in lower case on some XP builds
+	// ("information"/"warning"/...), so match case-insensitively -- otherwise the
+	// type column is never located and every event row is dropped.
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "information", "warning", "error", "success audit", "failure audit":
 		return true
 	}
 	return false
