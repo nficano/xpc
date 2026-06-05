@@ -217,8 +217,19 @@ func (l *otelLoop) scrapeMetrics(ctx context.Context) *otel.Snapshot {
 }
 
 func (l *otelLoop) scrapeTypeperf(ctx context.Context) (*float64, *int64, error) {
-	const cmdLine = `typeperf "\Processor(_Total)\% Processor Time" "\Memory\Available Bytes" -sc 1`
-	stdout, stderr, rc, err := runRemoteCmd(ctx, l.g, cmdLine, "cmd")
+	// Run typeperf with an explicit argv via the python subprocess passthrough
+	// (shell=False) instead of cmd.exe. cmd.exe mangles the counter path's "%"
+	// and spaces -- "\Processor(_Total)\% Processor Time" reaches typeperf
+	// truncated at "\%", so it reports "No valid counters" and exits 0xF0000002.
+	// Same cmd.exe command-line quoting bug worked around for reg.exe in
+	// runRegPassthrough; the counters themselves are healthy.
+	py := buildSubprocessPy([]string{
+		"typeperf",
+		`\Processor(_Total)\% Processor Time`,
+		`\Memory\Available Bytes`,
+		"-sc", "1",
+	})
+	stdout, stderr, rc, err := runRemoteCmd(ctx, l.g, py, "python")
 	if err != nil {
 		return nil, nil, err
 	}
