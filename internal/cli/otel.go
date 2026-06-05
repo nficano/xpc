@@ -217,8 +217,19 @@ func (l *otelLoop) scrapeMetrics(ctx context.Context) *otel.Snapshot {
 }
 
 func (l *otelLoop) scrapeTypeperf(ctx context.Context) (*float64, *int64, error) {
-	const cmdLine = `typeperf "\Processor(_Total)\% Processor Time" "\Memory\Available Bytes" -sc 1`
-	stdout, stderr, rc, err := runRemoteCmd(ctx, l.g, cmdLine, "cmd")
+	// Run typeperf with an explicit argv via the python subprocess passthrough
+	// (shell=False) instead of cmd.exe. cmd.exe mangles the counter path's "%"
+	// and spaces -- "\Processor(_Total)\% Processor Time" reaches typeperf
+	// truncated at "\%", so it reports "No valid counters" and exits 0xF0000002.
+	// Same cmd.exe command-line quoting bug worked around for reg.exe in
+	// runRegPassthrough; the counters themselves are healthy.
+	py := buildSubprocessPy([]string{
+		"typeperf",
+		`\Processor(_Total)\% Processor Time`,
+		`\Memory\Available Bytes`,
+		"-sc", "1",
+	})
+	stdout, stderr, rc, err := runRemoteCmd(ctx, l.g, py, "python")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -325,6 +336,10 @@ func (l *otelLoop) scrapeEventLog(ctx context.Context, logName string) ([]otel.L
 // parseTypeperf reads `typeperf ... -sc 1` PDH-CSV output. The header row's
 // first field contains "PDH-CSV"; the data row is "timestamp",cpu,mem.
 func parseTypeperf(text string) (cpuPct *float64, memBytes *int64) {
+	// Windows Python text-mode stdout turns typeperf's \r\n into \r\r\n; the
+	// doubled CR breaks encoding/csv, which then parses no data row. Strip all
+	// CRs so records are plain \n-terminated.
+	text = strings.ReplaceAll(text, "\r", "")
 	r := csv.NewReader(strings.NewReader(text))
 	r.FieldsPerRecord = -1
 	for {
@@ -441,8 +456,11 @@ func parseEventTime(s string) (time.Time, bool) {
 }
 
 func isEventType(s string) bool {
-	switch s {
-	case "Information", "Warning", "Error", "Success Audit", "Failure Audit":
+	// eventquery.vbs renders the Type column in lower case on some XP builds
+	// ("information"/"warning"/...), so match case-insensitively -- otherwise the
+	// type column is never located and every event row is dropped.
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "information", "warning", "error", "success audit", "failure audit":
 		return true
 	}
 	return false

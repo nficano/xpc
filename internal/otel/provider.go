@@ -209,11 +209,13 @@ func (p *Provider) EmitLogs(ctx context.Context, entries []LogEntry) {
 	now := time.Now()
 	for _, e := range entries {
 		var r otellog.Record
-		ts := e.Timestamp
-		if ts.IsZero() {
-			ts = now
-		}
-		r.SetTimestamp(ts)
+		// eventquery.vbs reports the event time in the HOST's local clock with no
+		// timezone, and the collector doesn't know the VM's locale -- parsing it as
+		// the collector's tz mis-places records (a Pacific host scraped by a UTC
+		// collector lands ~7h in the past, outside normal time windows). This is a
+		// near-real-time tailer with no backfill, so use the scrape time as the
+		// record timestamp and keep the host-local clock string as an attribute.
+		r.SetTimestamp(now)
 		r.SetObservedTimestamp(now)
 		sev, txt := severityFor(e.Type)
 		r.SetSeverity(sev)
@@ -228,6 +230,9 @@ func (p *Provider) EmitLogs(ctx context.Context, entries []LogEntry) {
 		}
 		if e.Category != "" {
 			attrs = append(attrs, otellog.String("event.category", e.Category))
+		}
+		if !e.Timestamp.IsZero() {
+			attrs = append(attrs, otellog.String("event.time", e.Timestamp.Format("2006-01-02 15:04:05")))
 		}
 		r.AddAttributes(attrs...)
 		p.logger.Emit(ctx, r)
@@ -270,21 +275,23 @@ func (p *Provider) Shutdown(ctx context.Context) error {
 
 // severityFor maps a Windows Event Log type token to an OTLP severity.
 func severityFor(t string) (otellog.Severity, string) {
-	switch strings.TrimSpace(t) {
-	case "Error":
+	// Case-insensitive: eventquery.vbs emits lower-case types ("information") on
+	// some XP builds. Preserve the canonical descriptive label in severity_text.
+	switch strings.ToLower(strings.TrimSpace(t)) {
+	case "error":
 		return otellog.SeverityError, "Error"
-	case "Failure Audit":
+	case "failure audit":
 		return otellog.SeverityError, "Failure Audit"
-	case "Warning":
+	case "warning":
 		return otellog.SeverityWarn, "Warning"
-	case "Information":
+	case "information":
 		return otellog.SeverityInfo, "Information"
-	case "Success Audit":
+	case "success audit":
 		return otellog.SeverityInfo, "Success Audit"
 	case "":
 		return otellog.SeverityUndefined, ""
 	default:
-		return otellog.SeverityInfo, t
+		return otellog.SeverityInfo, strings.TrimSpace(t)
 	}
 }
 
